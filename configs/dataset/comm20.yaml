@@ -1,0 +1,5 @@
+name: comm20
+remove_h: null
+molecules: False
+spectre: True
+datadir: 'data/comm20/'

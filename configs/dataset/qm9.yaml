@@ -1,0 +1,7 @@
+name: 'qm9'
+datadir: 'data/qm9/qm9_pyg/'
+remove_h: True
+random_subset: null
+pin_memory: False
+molecules: True
+spectre: False

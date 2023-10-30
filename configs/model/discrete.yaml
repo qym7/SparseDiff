@@ -1,0 +1,32 @@
+# Model settings
+diffusion_steps: 500
+diffusion_noise_schedule: 'cosine'              # 'cosine', 'polynomial_2'
+n_layers: 5
+dropout: 0.1
+
+output_y: False                              # if the model contain last layer to output y
+scaling_layer: False
+
+extra_features: 'all'        # 'all', 'cycles', or null
+eigenfeatures: True
+edge_features: 'all'          # 'all', 'dist', 'localngbs' or null
+num_eigenvectors: 8       # eigenvectors
+num_eigenvalues: 5      # eigenvalues
+use_charge: False
+num_degree: 10
+dist_feat: True
+positional_encoding: True
+
+# sign net
+sign_net: False
+sn_hidden_dim: 32
+
+# sparse generation settings
+edge_fraction: 0.5
+autoregressive: False
+
+
+# The dimensions should satisfy dx % n_head == 0
+hidden_dims : {'dx': 256, 'de': 64, 'dy': 64, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 128, 'dim_ffy': 128}
+
+lambda_train: [5, 0, 2]              # X=1, E = lambda[0], y = lambda[1]

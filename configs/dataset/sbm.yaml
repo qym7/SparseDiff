@@ -1,0 +1,6 @@
+name: 'sbm'
+datadir: 'data/sbm'
+remove_h: null
+molecules: False
+spectre: True
+pin_memory: False

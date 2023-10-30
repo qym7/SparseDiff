@@ -1,0 +1,30 @@
+# @package _global_
+general:
+    name : 'planar'
+    gpus : 1
+    wandb: 'online'
+    test_only: null
+    resume: '/home/vignac/2023Spring-DiGress/outputs/2023-10-10/10-42-33-res_drop/checkpoints/res_drop/last.ckpt'
+    check_val_every_n_epochs: 300
+    sample_every_val: 10
+    samples_to_generate: 40
+    samples_to_save: 9
+    chains_to_save: 1
+    final_model_samples_to_generate: 40
+    final_model_samples_to_save: 30
+    final_model_chains_to_save: 20
+train:
+    n_epochs: 300000
+    batch_size: 64
+    save_model: True
+model:
+    diffusion_steps: 1000
+    edge_fraction: 0.5
+    n_layers: 10
+    lambda_train: [5, 0, 2]
+    extra_features: 'all'
+    # Do not set hidden_mlp_E, dim_ffE too high, computing large tensors on the edges is costly
+    # At the moment (03/08), y contains quite little information
+    hidden_mlp_dims: { 'X': 128, 'E': 64, 'y': 256}
+    # The dimensions should satisfy dx % n_head == 0
+    hidden_dims: { 'dx': 256, 'de': 64, 'dy': 256, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 64, 'dim_ffy': 256 }

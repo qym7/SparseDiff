@@ -1,0 +1,15 @@
+# @package _global_
+general:
+    name : 'final_test'
+    gpus : 1
+    wandb: 'disabled'
+    sample_every_val: 3
+    samples_to_generate: 10
+    samples_to_save: 3
+    chains_to_save: 2
+    test_only: False
+train:
+    ema_decay : 0
+    batch_size: 10
+    save_model: False
+    n_epochs : 2

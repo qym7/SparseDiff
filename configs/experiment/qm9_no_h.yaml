@@ -1,0 +1,28 @@
+# @package _global_
+general:
+    name : 'qm9_no_h'
+    gpus : 1
+    wandb: 'online'
+    test_only: null
+    check_val_every_n_epochs: 32
+    sample_every_val: 1
+    evaluate_all_checkpoints: False
+    samples_to_generate: 1024
+train:
+    n_epochs: 1000
+    batch_size: 1024
+    save_model: True
+    num_workers: 0
+model:
+    n_layers: 9
+    lambda_train: [1, 0, 2]
+    use_charge: True
+    edge_fraction: 1.0
+    hidden_dims: {'dx': 256, 'de': 64, 'dy': 128, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 128, 'dim_ffy': 128}
+dataset:
+    name: 'qm9'            # qm9, qm9_positional
+    datadir: 'data/qm9/qm9_pyg/'
+    remove_h: True
+    random_subset: null
+    pin_memory: False
+

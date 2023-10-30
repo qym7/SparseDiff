@@ -1,0 +1,5 @@
+name: planar
+datadir: 'data/planar/' 
+remove_h: null
+molecules: False
+spectre: True

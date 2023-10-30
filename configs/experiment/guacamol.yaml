@@ -1,0 +1,48 @@
+# @package _global_
+general:
+    name : 'edge25'
+    gpus : 2
+    wandb: 'online'
+    resume: null
+    test_only: null
+    check_val_every_n_epochs: 1
+    val_check_interval: null
+    sample_every_val: 40
+    samples_to_generate: 1024
+    samples_to_save: 20
+    chains_to_save: 2
+    log_every_steps: 50
+    final_model_samples_to_generate: 12000
+    final_model_samples_to_save: 100
+    final_model_chains_to_save: 50
+train:
+    optimizer: adam
+    n_epochs: 2000
+    batch_size: 512
+    save_model: True
+    lr: 2e-4
+model:
+    n_layers: 12
+    lambda_train: [5, 0, 2]
+    type: 'discrete'
+    transition: 'marginal'                          # uniform or marginal
+    model: 'graph_tf'
+    diffusion_steps: 500
+    edge_fraction: 0.25
+    diffusion_noise_schedule: 'cosine'              # 'cosine', 'polynomial_2'
+    extra_features: 'all'                           # 'all', 'cycles', 'eigenvalues' or null
+    use_charge: True
+
+  # Do not set hidden_mlp_E, dim_ffE too high, computing large tensors on the edges is costly
+  # At the moment (03/08), y contains quite little information
+    hidden_mlp_dims: {'X': 256, 'E': 128, 'y': 256}
+
+  # The dimensions should satisfy dx % n_head == 0
+    hidden_dims: {'dx': 256, 'de': 64, 'dy': 128, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 128, 'dim_ffy': 256}
+
+dataset:
+    name: 'guacamol'
+    datadir: 'data/guacamol/guacamol_pyg/'       # Relative to the guacamol_dataset.py file
+    remove_h: null
+    molecules: True                     # Use the molecules dataset
+    spectre: False
