@@ -1,9 +1,6 @@
 # `Sparse denoising diffusion for large graph generation`
 
-Warning: The code has been updated after experiments were run for the paper. If you don't manage to reproduce the 
-paper results, please write to us so that we can investigate the issue.
-
-For the conditional generation experiments, check the `guidance` branch. 
+Note (November 7th): the code is currently incomplete as we running experiments again with a slightly improved architecture. Checkpoints will be added progressively when they are available.
 
 ## Environment installation
 This code was tested with PyTorch 2.0.1, cuda 11.8 and torch_geometrics 2.3.1
@@ -42,13 +39,6 @@ This code was tested with PyTorch 2.0.1, cuda 11.8 and torch_geometrics 2.3.1
     
      ```g++ -O2 -std=c++11 -o orca orca.cpp```
 
-## Download the data
-
-  - QM9 and Guacamol should download by themselves when you run the code.
-  - For the community, SBM, planar and Protein datasets, data can be found at https://github.com/KarolisMart/SPECTRE/tree/main/data
-  - Moses dataset can be found at https://github.com/molecularsets/moses/tree/master/data
-  - Ego dataset can be found at https://github.com/tufts-ml/graph-generation-EDGE/tree/main/datasets
-
 
 ## Run the code
   
@@ -59,14 +49,17 @@ This code was tested with PyTorch 2.0.1, cuda 11.8 and torch_geometrics 2.3.1
   - You can specify the dataset with `python3 main.py dataset=guacamol`. Look at `configs/dataset` for the list of datasets that are currently available
   - You can specify the edge fraction (denoted as $\lambda$ in the paper) with `python3 main.py model.edge_fraction=0.2` to control the GPU-usage
 
-## Checkpoints
-
-The following checkpoints should work with the latest commit will be released further.
-
-## Generated samples
-
-
-Generated samples for some of the models will be released further.
+## Cite the paper
+```
+@misc{qin2023sparse,
+      title={Sparse Training of Discrete Diffusion Models for Graph Generation}, 
+      author={Yiming Qin and Clement Vignac and Pascal Frossard},
+      year={2023},
+      eprint={2311.02142},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG}
+}
+```
 
 <!-- If you have retrained a model from scratch for which the samples are not available yet, we would be very happy if you could send them to us! -->
 
