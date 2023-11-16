@@ -4,7 +4,6 @@ general:
     gpus : 1
     wandb: 'online'
     test_only: null
-    resume: '/home/vignac/2023Spring-DiGress/outputs/2023-10-10/10-42-33-res_drop/checkpoints/res_drop/last.ckpt'
     check_val_every_n_epochs: 300
     sample_every_val: 10
     samples_to_generate: 40
