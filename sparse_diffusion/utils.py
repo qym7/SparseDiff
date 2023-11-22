@@ -425,3 +425,25 @@ def split_samples(samples, start_idx, end_idx):
         node=node, edge_index=edge_index, edge_attr=edge_attr,
         y=y, ptr=ptr, batch=batch, charge=charge
         )
+
+
+def densify_noisy_data(sparse_noisy_data):
+    noisy_data = dict()
+    for i in ["t_float", "y_t", "t_int", "y_t", "alpha_t_bar", "alpha_s_bar", "beta_t"]:
+        if i in sparse_noisy_data.keys():
+            noisy_data[i] = sparse_noisy_data[i]
+
+    dense_noisy_data, node_mask = to_dense(
+        sparse_noisy_data["node_t"],
+        sparse_noisy_data["edge_index_t"],
+        sparse_noisy_data["edge_attr_t"],
+        sparse_noisy_data["batch"],
+        charge=sparse_noisy_data["charge_t"],
+    )
+
+    noisy_data["X_t"] = dense_noisy_data.X
+    noisy_data["E_t"] = dense_noisy_data.E
+    noisy_data["charge_t"] = dense_noisy_data.charge
+    noisy_data["node_mask"] = node_mask
+
+    return noisy_data
