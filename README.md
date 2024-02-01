@@ -1,7 +1,5 @@
 # `Sparse denoising diffusion for large graph generation`
 
-Note (November 7th): the code is currently incomplete as we running experiments again with a slightly improved architecture. Checkpoints will be added progressively when they are available.
-
 ## Environment installation
 This code was tested with PyTorch 2.0.1, cuda 11.8 and torch_geometrics 2.3.1
 
