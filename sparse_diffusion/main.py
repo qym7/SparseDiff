@@ -28,12 +28,12 @@ resource.setrlimit(
     resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
 )
 
-
 @hydra.main(version_base="1.3", config_path="../configs", config_name="config")
 def main(cfg: DictConfig):
     dataset_config = cfg["dataset"]
     pl.seed_everything(cfg.train.seed)
 
+    print('creating datasets')
     if dataset_config["name"] in ["sbm", "comm20", "planar", "ego"]:
         from datasets.spectre_dataset_pyg import (
             SBMDataModule,
@@ -66,6 +66,15 @@ def main(cfg: DictConfig):
         domain_features = DummyExtraFeatures()
         dataloaders = datamodule.dataloaders
 
+    elif dataset_config["name"] == 'point_cloud':
+        from datasets import point_cloud_dataset
+
+        datamodule = point_cloud_dataset.PointCloudDataModule(cfg)
+        dataset_infos = point_cloud_dataset.PointCloudInfos(datamodule=datamodule)
+        train_metrics = TrainAbstractMetricsDiscrete()
+        domain_features = DummyExtraFeatures()
+        dataloaders = datamodule.dataloaders
+
     elif dataset_config["name"] in ["qm9", "guacamol", "moses"]:
         if dataset_config["name"] == "qm9":
             from datasets import qm9_dataset
@@ -78,14 +87,12 @@ def main(cfg: DictConfig):
 
             datamodule = guacamol_dataset.GuacamolDataModule(cfg)
             dataset_infos = guacamol_dataset.GuacamolInfos(datamodule, cfg)
-            # datamodule.prepare_data()
 
         elif dataset_config.name == "moses":
             from datasets import moses_dataset
 
             datamodule = moses_dataset.MosesDataModule(cfg)
             dataset_infos = moses_dataset.MosesInfos(datamodule, cfg)
-            # datamodule.prepare_data()
         else:
             raise ValueError("Dataset not implemented")
 
@@ -140,6 +147,8 @@ def main(cfg: DictConfig):
     }
 
     utils.create_folders(cfg)
+    
+    print('creating model')
     model = DiscreteDenoisingDiffusion(cfg=cfg, **model_kwargs)
 
     callbacks = []
@@ -147,10 +156,12 @@ def main(cfg: DictConfig):
         checkpoint_callback = ModelCheckpoint(
             dirpath=f"checkpoints/{cfg.general.name}",
             filename="{epoch}",
-            monitor="val/epoch_NLL",
-            save_top_k=10,
+            save_last=True,
+            monitor=cfg.general.monitor,
+            save_top_k=cfg.general.save_top_k,
             mode="min",
-            every_n_epochs=1,
+            save_on_train_epoch_end=cfg.general.save_on_train_epoch_end,
+            every_n_epochs=cfg.general.every_n_epochs,
         )
         last_ckpt_save = ModelCheckpoint(
             dirpath=f"checkpoints/{cfg.general.name}",
@@ -168,6 +179,7 @@ def main(cfg: DictConfig):
     trainer = pl.Trainer(
         gradient_clip_val=cfg.train.clip_grad,
         strategy="ddp",
+        # strategy="ddp_find_unused_parameters_true",
         accelerator="gpu" if use_gpu else "cpu",
         devices=cfg.general.gpus if use_gpu else 1,
         val_check_interval=cfg.general.val_check_interval,
@@ -177,7 +189,7 @@ def main(cfg: DictConfig):
         callbacks=callbacks,
         log_every_n_steps=50 if name != "debug" else 1,
         enable_progress_bar=False,
-        logger=[],
+        logger=[]
     )
 
     if not cfg.general.test_only and not cfg.general.generated_path:
@@ -186,9 +198,8 @@ def main(cfg: DictConfig):
             trainer.test(model, datamodule=datamodule)
     else:
         # Start by evaluating test_only_path
-        for i in range(5):
-            pl.seed_everything(i * 1000)
-            trainer.test(model, datamodule=datamodule, ckpt_path=cfg.general.test_only)
+        pl.seed_everything(1000)
+        trainer.test(model, datamodule=datamodule, ckpt_path=cfg.general.test_only)
         if cfg.general.evaluate_all_checkpoints:
             directory = pathlib.Path(cfg.general.test_only).parents[0]
             print("Directory:", directory)

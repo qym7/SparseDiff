@@ -1,6 +1,8 @@
 import os
 from collections import Counter
+import pandas as pd
 
+# from fcd import get_fcd, load_ref_model
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.Chem import DataStructs
@@ -22,6 +24,7 @@ from torchmetrics import (
     MeanAbsoluteError,
 )
 from torchmetrics.utilities.data import _flatten_dict, allclose
+from fcd_torch import FCD
 
 import utils
 from sparse_diffusion.metrics.metrics_utils import (
@@ -146,6 +149,7 @@ class SamplingMolecularMetrics(nn.Module):
         self.validity_metric.update(
             value=len(valid) / len(generated), weight=len(generated)
         )
+
         return valid, all_smiles, error_message
 
     def evaluate(self, generated):
@@ -154,8 +158,37 @@ class SamplingMolecularMetrics(nn.Module):
         # Validity
         valid, all_smiles, error_message = self.compute_validity(generated)
         validity = self.validity_metric.compute().item()
-        uniqueness, novelty = 0, 0
+        uniqueness, novelty, fcd = 0, 0, 0
         self.valid_mols.extend(valid)
+
+        # FCD
+        FCD_eval = FCD(device='cuda:0', n_jobs=8)
+        # test_smiles = [for i in test_smiles]
+        test_smiles_no_h = []
+        total_count = 0
+        valid_count = 0
+        for smile in list(self.test_smiles):
+            total_count += 1
+            # mol = Chem.MolFromSmiles(smile, isomericSmiles=False)
+            # mol = Chem.MolFromSmiles(smile, isomericSmiles=False, canonical=True)
+            mol = Chem.MolFromSmiles(smile, sanitize=True)
+            # print('TEST SMILE', mol)
+            if mol is not None:  # wierd thing happens to test_smiles
+                valid_count += 1
+                for a in mol.GetAtoms():
+                    if a.GetNumImplicitHs():
+                        a.SetNumRadicalElectrons(a.GetNumImplicitHs())
+                        a.SetNoImplicit(True)
+                        a.UpdatePropertyCache()
+                molRemoveAllHs = Chem.RemoveAllHs(mol)
+                test_smiles_no_h.append(Chem.MolToSmiles(molRemoveAllHs))
+
+        print('among {} test smiles, {} are valid'.format(total_count, valid_count))
+        # import pdb; pdb.set_trace()
+        # fcd = FCD_eval(test_smiles_no_h, test_smiles_no_h)
+        fcd = FCD_eval(test_smiles_no_h, valid)
+        # fcd = FCD_eval(list(self.test_smiles), list(self.test_smiles))
+        # fcd = FCD_eval(list(self.train_smiles), list(self.train_smiles))
 
         # Uniqueness
         if len(self.valid_mols) > 0:
@@ -173,21 +206,26 @@ class SamplingMolecularMetrics(nn.Module):
         else:
             uniqueness = -1
             novelty = -1
+            fcd = -1
 
         num_molecules = int(self.validity_metric.weight.item())
         print(f"Validity over {num_molecules} molecules: {validity * 100 :.4f}%")
         print(f"Uniqueness: {uniqueness * 100 :.4f}%")
         print(f"Novelty: {novelty * 100 :.4f}%")
+        print(f"FCD: {fcd * 100 :.4f}%")
 
         key = "val" if not self.test else "test"
         dic = {
             f"{key}/Validity": validity * 100,
             f"{key}/Uniqueness": uniqueness * 100 if uniqueness != 0 else 0,
             f"{key}/Novelty": novelty * 100 if novelty != 0 else 0,
+            f"{key}/FCD": fcd if fcd != 0 else 0,
         }
 
         if wandb.run:
             wandb.log(dic, commit=False)
+
+        print(fcd)
 
         return all_smiles, dic
 
@@ -242,6 +280,19 @@ class SamplingMolecularMetrics(nn.Module):
         textfile.writelines(all_generated_smiles)
         textfile.close()
 
+        # save in csv for moses evaluation
+        df = pd.DataFrame({
+            'SMILES': all_generated_smiles,
+            'SPLIT': ['generated'] * len(all_generated_smiles)
+        })
+
+        # Define the CSV file name
+        from datetime import datetime
+        time_str = datetime.now().strftime("%M%S")
+        csv_filename_pandas = f"smiles_data_{time_str}.csv"
+        # Save the DataFrame to a CSV file
+        df.to_csv(csv_filename_pandas, index=False)
+
         # Save in the root folder if test_model
         if self.test:
             filename = f"final_smiles_GR{local_rank}_{0}.txt"
@@ -280,6 +331,7 @@ class SamplingMolecularMetrics(nn.Module):
             wandb.log(metrics, commit=False)
         if local_rank == 0:
             print(f"Sampling metrics done.")
+
         return metrics
 
 

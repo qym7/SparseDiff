@@ -28,7 +28,7 @@ def matrix_to_condensed_index(matrix_index, num_nodes):
     j = matrix_index[1]
     index = n * (n - 1) / 2 - (n - i) * (n - i - 1) / 2 + j - i - 1
     return index
-
+        
 
 def matrix_to_condensed_index_batch(matrix_index, num_nodes, edge_batch):
     """From https://stackoverflow.com/questions/5323818/condensed-matrix-function-to-find-pairs.

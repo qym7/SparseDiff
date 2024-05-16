@@ -113,11 +113,16 @@ class CrossEntropyMetric(Metric):
         self.add_state("total_ce", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total_samples", default=torch.tensor(0.0), dist_reduce_fx="sum")
 
-    def update(self, preds: Tensor, target: Tensor) -> None:
+    def update(self, preds: Tensor, target: Tensor, weight: Tensor=None) -> None:
         """Update state with predictions and targets.
         preds: Predictions from model   (bs * n, d) or (bs * n * n, d)
         target: Ground truth values     (bs * n, d) or (bs * n * n, d)."""
-        output = F.cross_entropy(preds, target, reduction="sum")
+        # output = F.cross_entropy(preds, target, reduction="sum")
+        if weight is not None:
+            output = F.cross_entropy(preds, target, reduction='none')
+            output = (output * weight).sum()
+        else:
+            output = F.cross_entropy(preds, target, reduction="sum")
 
         self.total_ce += output
         self.total_samples += preds.size(0)

@@ -45,36 +45,50 @@ class PredefinedNoiseScheduleDiscrete(torch.nn.Module):
     Predefined noise schedule. Essentially creates a lookup array for predefined (non-learned) noise schedules.
     """
 
-    def __init__(self, noise_schedule, timesteps):
+    def __init__(self, noise_schedule, timesteps, skip):
         super(PredefinedNoiseScheduleDiscrete, self).__init__()
         self.timesteps = timesteps
+        self.skip = skip
 
         if noise_schedule == "cosine":
             betas = diffusion_utils.cosine_beta_schedule_discrete(timesteps)
+            betas_skip = diffusion_utils.cosine_beta_schedule_discrete(timesteps, skip=skip)
         elif noise_schedule == "custom":
             betas = diffusion_utils.custom_beta_schedule_discrete(timesteps)
+            betas_skip = diffusion_utils.custom_beta_schedule_discrete(timesteps, skip=skip)
         else:
             raise NotImplementedError(noise_schedule)
 
         self.register_buffer("betas", torch.from_numpy(betas).float())
 
+        self.betas_skip =  torch.from_numpy(betas_skip).float()
         self.alphas = 1 - torch.clamp(self.betas, min=0, max=0.9999)
+        self.alphas_skip = 1 - torch.clamp(self.betas_skip, min=0, max=0.9999)
 
         log_alpha = torch.log(self.alphas)
         log_alpha_bar = torch.cumsum(log_alpha, dim=0)
         self.alphas_bar = torch.exp(log_alpha_bar)
+
+        log_alpha_skip = torch.log(self.alphas_skip)
+        log_alpha_bar_skip = torch.cumsum(log_alpha_skip, dim=0)
+        self.alphas_bar_skip = torch.exp(log_alpha_bar_skip)
         # print(f"[Noise schedule: {noise_schedule}] alpha_bar:", self.alphas_bar)
 
-    def forward(self, t_normalized=None, t_int=None):
+    def forward(self, t_normalized=None, t_int=None, skip=False):
         assert int(t_normalized is None) + int(t_int is None) == 1
         if t_int is None:
             t_int = torch.round(t_normalized * self.timesteps)
+        if skip:
+            return self.betas_skip.to(t_int.device)[t_int.long()//torch.tensor(self.skip, device=t_int.device)]
+        # print(self.betas)
         return self.betas.to(t_int.device)[t_int.long()]
 
-    def get_alpha_bar(self, t_normalized=None, t_int=None):
+    def get_alpha_bar(self, t_normalized=None, t_int=None, skip=False):
         assert int(t_normalized is None) + int(t_int is None) == 1
         if t_int is None:
             t_int = torch.round(t_normalized * self.timesteps)
+        if skip:
+            return self.alphas_bar_skip.to(t_int.device)[t_int.long()//torch.tensor(self.skip, device=t_int.device)]
         return self.alphas_bar.to(t_int.device)[t_int.long()]
 
 

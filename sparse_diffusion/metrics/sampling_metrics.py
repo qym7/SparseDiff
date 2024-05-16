@@ -16,6 +16,7 @@ from sparse_diffusion.metrics.metrics_utils import (
     wasserstein1d,
     total_variation1d,
 )
+
 class SamplingMetrics(nn.Module):
     def __init__(self, dataset_infos, test, dataloaders=None):
         super().__init__()
@@ -48,19 +49,22 @@ class SamplingMetrics(nn.Module):
                 PlanarSamplingMetrics,
                 SBMSamplingMetrics,
                 ProteinSamplingMetrics,
+                PointCloudSamplingMetrics,
                 EgoSamplingMetrics
             )
 
             if dataset_infos.dataset_name == "comm20":
-                self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders)
+                self.domain_metrics = Comm20SamplingMetrics(dataloaders=dataloaders, test=test)
             elif dataset_infos.dataset_name == "planar":
-                self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders)
+                self.domain_metrics = PlanarSamplingMetrics(dataloaders=dataloaders, test=test)
             elif dataset_infos.dataset_name == "sbm":
-                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders)
+                self.domain_metrics = SBMSamplingMetrics(dataloaders=dataloaders, test=test)
             elif dataset_infos.dataset_name == "protein":
-                self.domain_metrics = ProteinSamplingMetrics(dataloaders=dataloaders)
+                self.domain_metrics = ProteinSamplingMetrics(dataloaders=dataloaders, test=test)
+            elif dataset_infos.dataset_name == "point_cloud":
+                self.domain_metrics = PointCloudSamplingMetrics(dataloaders=dataloaders, test=test)
             elif dataset_infos.dataset_name == "ego":
-                self.domain_metrics = EgoSamplingMetrics(dataloaders=dataloaders)
+                self.domain_metrics = EgoSamplingMetrics(dataloaders=dataloaders, test=test)
             else:
                 raise ValueError(
                     "Dataset {} not implemented".format(dataset_infos.dataset_name)

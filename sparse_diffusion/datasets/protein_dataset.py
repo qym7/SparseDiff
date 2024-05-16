@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torch
 from torch.utils.data import random_split
 import torch_geometric.utils
+from torch_geometric.utils import remove_self_loops
 from torch_geometric.data import InMemoryDataset, download_url
 from hydra.utils import get_original_cwd
 
@@ -85,7 +86,6 @@ class ProteinDataset(InMemoryDataset):
                 f"train_n.pickle",
                 f"train_node_types.npy",
                 f"train_bond_types.npy",
-                # f"train_graph_types.npy",
             ]
         elif self.split == "val":
             return [
@@ -93,7 +93,6 @@ class ProteinDataset(InMemoryDataset):
                 f"val_n.pickle",
                 f"val_node_types.npy",
                 f"val_bond_types.npy",
-                # f"val_graph_types.npy",
             ]
         else:
             return [
@@ -101,7 +100,6 @@ class ProteinDataset(InMemoryDataset):
                 f"test_n.pickle",
                 f"test_node_types.npy",
                 f"test_bond_types.npy",
-                # f"test_graph_types.npy",
             ]
 
     def download(self):
@@ -118,12 +116,12 @@ class ProteinDataset(InMemoryDataset):
 
         # split data
         g_cpu = torch.Generator()
-        g_cpu.manual_seed(0)
+        g_cpu.manual_seed(1234)
         
         min_num_nodes=100
         max_num_nodes=500
         available_graphs = []
-        for idx in np.arange(data_graph_indicator.max()):
+        for idx in np.arange(1, data_graph_indicator.max()+1):
             node_idx = data_graph_indicator == idx
             if node_idx.sum() >= min_num_nodes and node_idx.sum() <= max_num_nodes:
                 available_graphs.append(idx)
@@ -133,11 +131,17 @@ class ProteinDataset(InMemoryDataset):
         test_len = int(round(self.num_graphs * 0.2))
         train_len = int(round((self.num_graphs - test_len) * 0.8))
         val_len = self.num_graphs - train_len - test_len
-        indices = torch.randperm(self.num_graphs, generator=g_cpu)
+        # # OLD IMPLEMENTATION
+        # indices = torch.randperm(self.num_graphs, generator=g_cpu)
+        # train_indices = available_graphs[indices][:train_len]
+        # val_indices = available_graphs[indices][train_len : train_len + val_len]
+        # test_indices = available_graphs[indices][train_len + val_len :]
+        # SPECTRE IMPLEMENTATION
+        train_indices, val_indices, test_indices = random_split(available_graphs,
+                                                                [train_len, val_len, test_len],
+                                                                generator=torch.Generator().manual_seed(1234))
         print(f"Dataset sizes: train {train_len}, val {val_len}, test {test_len}")
-        train_indices = available_graphs[indices][:train_len]
-        val_indices = available_graphs[indices][train_len : train_len + val_len]
-        test_indices = available_graphs[indices][train_len + val_len :]
+        
         print(f"Train indices: {train_indices}")
         print(f"Val indices: {val_indices}")
         print(f"Test indices: {test_indices}")
@@ -173,18 +177,13 @@ class ProteinDataset(InMemoryDataset):
             edge_index[:, 0] = reverse_perm[edge_index[:, 0]]
             edge_index[:, 1] = reverse_perm[edge_index[:, 1]]
             edge_attr = torch.ones_like(edge_index[:, 0]).long()
+            edge_index, edge_attr = remove_self_loops(edge_index.T, edge_attr)
             data = torch_geometric.data.Data(
                 x=nodes,
-                edge_index=edge_index.T,
+                edge_index=edge_index,
                 edge_attr=edge_attr,
                 n_nodes=nodes.shape[0],
             )
-            # `# import pdb; pdb.set_trace()` is a debugging statement in Python. When this line is
-            # executed, it will pause the execution of the program and launch the Python debugger
-            # (pdb). This allows you to interactively debug the code at that point and inspect
-            # variables, step through the code, and execute arbitrary Python statements to understand
-            # the program's behavior.
-            # print(edge_index.min(), edge_index.max(), nodes.shape)
 
             if self.pre_filter is not None and not self.pre_filter(data):
                 continue
@@ -209,7 +208,7 @@ class ProteinDataModule(AbstractDataModule):
         self.dataset_name = self.cfg.dataset.name
         self.datadir = cfg.dataset.datadir
         base_path = pathlib.Path(get_original_cwd()).parents[0]
-        root_path = os.path.join(base_path, 'data/DD')
+        root_path = os.path.join(base_path, cfg.dataset.datadir)
         transform = RemoveYTransform()
 
         datasets = {

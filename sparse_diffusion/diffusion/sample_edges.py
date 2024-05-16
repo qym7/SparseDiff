@@ -259,12 +259,6 @@ def sample_non_existing_edges_batched(
     num_edges_total = (num_nodes * (num_nodes - 1) / 2).long()
     # Count existing edges using global pooling. In case a graph has no edge, global_add_pool
     # May return something of the wrong length. To avoid this, add a 0 for each graph
-    # TODO: check if it can be simplified using the size argument of global add pool
-    # full_edge_count = torch.hstack((torch.ones(existing_edge_index.shape[1], device=device),
-    #                                 torch.zeros(batch.max()+1, device=device)))   # (ne+bs)
-    # full_edge_batch = torch.hstack((batch[existing_edge_index[0]],
-    #                                 torch.arange(batch.max()+1, device=device)))  # (ne+bs)
-    # num_edges_existing = pool.global_add_pool(x=full_edge_count, batch=full_edge_batch).long()
     num_edges_existing = pool.global_add_pool(
         x=torch.ones(existing_edge_index.shape[1], device=device),
         batch=batch[existing_edge_index[0]],
@@ -423,18 +417,6 @@ def sample_non_existing_edges_batched(
         edge_batch=sampled_edge_batch,
         ptr=offset,
     )
-
-    # # debugging
-    # # check if there are repeated edges
-    # print('smallest graph size is {}'.format(num_nodes.min()))
-    # existing_ind_w_offset = existing_indices + sq_offset[existing_edge_batch]
-    # samp_ind_w_offset = new_indices + sq_offset[sampled_edge_batch]
-    # repeated = existing_ind_w_offset.round().unsqueeze(1) == samp_ind_w_offset.round().unsqueeze(0)
-    # repeated_ind = torch.where(repeated)
-    # if repeated.sum()>0:
-    #     print('repeated edges')
-    #     import pdb; pdb.set_trace()
-    #     cur_shift = to_shift[sampled_ind_mask][1188] - cumsum_offset[1188]
 
     return new_edge_index
 

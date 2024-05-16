@@ -4,6 +4,7 @@ import os.path as osp
 
 import numpy as np
 from tqdm import tqdm
+import networkx as nx
 import torch
 import pickle as pkl
 import torch_geometric.utils
@@ -64,7 +65,8 @@ class SpectreGraphDataset(InMemoryDataset):
 
     @property
     def raw_file_names(self):
-        return ["train.pt", "val.pt", "test.pt"]
+        return ["train.pt", "val.pt", "test.pt", 'ego.pkl', 'ego_ns.pkl']
+        # return ["train.pkl", "val.pkl", "test.pkl"]
 
     @property
     def split_file_name(self):
@@ -133,7 +135,7 @@ class SpectreGraphDataset(InMemoryDataset):
             ) = torch.load(file_path)
             
         g_cpu = torch.Generator()
-        g_cpu.manual_seed(0)
+        g_cpu.manual_seed(1234)
         self.num_graphs = len(adjs)
 
         if self.dataset_name == 'ego':
@@ -161,23 +163,38 @@ class SpectreGraphDataset(InMemoryDataset):
         train_data = []
         val_data = []
         test_data = []
+        train_data_nx = []
+        val_data_nx = []
+        test_data_nx = []
 
         for i, adj in enumerate(adjs):
             # permute randomly nodes as for molecular datasets
             random_order = torch.randperm(adj.shape[-1])
             adj = adj[random_order, :]
             adj = adj[:, random_order]
+            net = nx.from_numpy_matrix(adj.numpy()).to_undirected()
 
             if i in train_indices:
                 train_data.append(adj)
+                train_data_nx.append(net)
             if i in val_indices:
                 val_data.append(adj)
+                val_data_nx.append(net)
             if i in test_indices:
                 test_data.append(adj)
+                test_data_nx.append(net)
 
         torch.save(train_data, self.raw_paths[0])
         torch.save(val_data, self.raw_paths[1])
         torch.save(test_data, self.raw_paths[2])
+
+        # import pdb; pdb.set_trace()
+        all_data = {'train': train_data_nx, 'val': val_data_nx, 'test': test_data_nx}
+        import pickle
+        with open(self.raw_paths[3], 'wb') as handle:
+            pickle.dump(all_data, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        with open(self.raw_paths[4], 'wb') as handle:
+            pickle.dump(train_data_nx+val_data_nx+test_data_nx, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
     def process(self):

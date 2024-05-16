@@ -65,10 +65,16 @@ def cosine_beta_schedule(timesteps, s=0.008, raise_to_power: float = 1):
     return alphas_cumprod
 
 
-def cosine_beta_schedule_discrete(timesteps, s=0.008):
+def cosine_beta_schedule_discrete(timesteps, s=0.008, skip=1):
     """Cosine schedule as proposed in https://openreview.net/forum?id=-NEXDKk8gZ."""
+    # steps = timesteps + 2
+    # x = np.linspace(0, steps, steps)
+    # # skip_index = np.concatenate([np.array([0]),np.arange(1, timesteps+1, skip),np.array([steps-1])])
+    # skip_index = np.concatenate([np.array([0]),np.arange(skip, timesteps+1, skip),np.array([steps-1])])
+    # x = x[skip_index]
     steps = timesteps + 2
-    x = np.linspace(0, steps, steps)
+    num_steps = timesteps//skip + 2
+    x = np.linspace(0, steps, num_steps)
 
     alphas_cumprod = np.cos(0.5 * np.pi * ((x / steps) + s) / (1 + s)) ** 2
     alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
@@ -77,10 +83,16 @@ def cosine_beta_schedule_discrete(timesteps, s=0.008):
     return betas.squeeze()
 
 
-def custom_beta_schedule_discrete(timesteps, average_num_nodes=50, s=0.008):
+def custom_beta_schedule_discrete(timesteps, average_num_nodes=50, s=0.008, skip=1):
     """Cosine schedule as proposed in https://openreview.net/forum?id=-NEXDKk8gZ."""
+    # steps = timesteps + 2
+    # x = np.linspace(0, steps, steps)
+    # # skip_index = np.concatenate([np.array([0]),np.arange(1, timesteps+1, skip),np.array([steps-1])])
+    # skip_index = np.concatenate([np.array([0]),np.arange(skip, timesteps+1, skip),np.array([steps-1])])
+    # x = x[skip_index]
     steps = timesteps + 2
-    x = np.linspace(0, steps, steps)
+    num_steps = timesteps//skip + 2
+    x = np.linspace(0, steps, num_steps)
 
     alphas_cumprod = np.cos(0.5 * np.pi * ((x / steps) + s) / (1 + s)) ** 2
     alphas_cumprod = alphas_cumprod / alphas_cumprod[0]

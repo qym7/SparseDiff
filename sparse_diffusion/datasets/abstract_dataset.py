@@ -23,7 +23,7 @@ class AbstractDataModule(LightningDataset):
         self.output_dims = None
         
         self.dataset_stat()
-        
+
     def dataset_stat(self):
         dataset = self.train_dataset + self.val_dataset + self.test_dataset
         
@@ -204,10 +204,15 @@ class AbstractDatasetInfos:
         ex_extra_feat = extra_features(example_data)
         if type(ex_extra_feat) == tuple:
             ex_extra_feat = ex_extra_feat[0]
-        self.input_dims.X += ex_extra_feat.X.size(-1)
-        self.input_dims.E += ex_extra_feat.E.size(-1)
-        self.input_dims.y += ex_extra_feat.y.size(-1)
-
+        try:
+            self.input_dims.X += ex_extra_feat.X.size(-1)
+            self.input_dims.E += ex_extra_feat.E.size(-1)
+            self.input_dims.y += ex_extra_feat.y.size(-1)
+        except:
+            self.input_dims.X += ex_extra_feat.node.size(-1)
+            self.input_dims.E += ex_extra_feat.edge_attr.size(-1)
+            self.input_dims.y += ex_extra_feat.y.size(-1)
+            
         mol_extra_feat = domain_features(example_data)
         if type(mol_extra_feat) == tuple:
             mol_extra_feat = mol_extra_feat[0]

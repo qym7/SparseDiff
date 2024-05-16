@@ -4,6 +4,7 @@ from typing import Optional, Tuple, Union
 import torch
 import torch.nn as nn
 from torch import Tensor
+from torch.nn import init
 from torch.nn import functional as F
 from torch.nn.modules.linear import Linear
 from torch.nn.modules.dropout import Dropout
@@ -15,6 +16,7 @@ from torch_geometric.utils import softmax, sort_edge_index
 
 from sparse_diffusion import utils
 from sparse_diffusion.models.transconv_layer import TransformerConv
+from sparse_diffusion.models.layers import SparseXtoy, SparseEtoy
 
 
 class XEyTransformerLayer(nn.Module):
@@ -62,26 +64,17 @@ class XEyTransformerLayer(nn.Module):
         self.linX2 = Linear(dim_ffX, dx, **kw)
         self.normX1 = LayerNorm(dx, eps=layer_norm_eps, **kw)  # TODO: set norm
         self.normX2 = LayerNorm(dx, eps=layer_norm_eps, **kw)
-        self.dropoutX1 = Dropout(dropout)
-        self.dropoutX2 = Dropout(dropout)
-        self.dropoutX3 = Dropout(dropout)
 
         self.linE1 = Linear(de, dim_ffE, **kw)
         self.linE2 = Linear(dim_ffE, de, **kw)
         self.normE1 = LayerNorm(de, eps=layer_norm_eps, **kw)  # TODO: set norm
         self.normE2 = LayerNorm(de, eps=layer_norm_eps, **kw)
-        self.dropoutE1 = Dropout(dropout)
-        self.dropoutE2 = Dropout(dropout)
-        self.dropoutE3 = Dropout(dropout)
 
         if self.last_layer:
             self.lin_y1 = Linear(dy, dim_ffy, **kw)
             self.lin_y2 = Linear(dim_ffy, dy, **kw)
             self.norm_y1 = LayerNorm(dy, eps=layer_norm_eps, **kw)  # TODO: set norm
             self.norm_y2 = LayerNorm(dy, eps=layer_norm_eps, **kw)
-            self.dropout_y1 = Dropout(dropout)
-            self.dropout_y2 = Dropout(dropout)
-            self.dropout_y3 = Dropout(dropout)
 
         self.activation = F.relu
 
@@ -97,29 +90,23 @@ class XEyTransformerLayer(nn.Module):
         """
         new_x, new_edge_attr, new_y = self.self_attn(X, edge_index, edge_attr, y, batch)
 
-        new_x_d = self.dropoutX1(new_x)  # X, d
-        X = self.normX1(X + new_x_d)
+        X = self.normX1(X + new_x)
 
-        new_edge_attr_d = self.dropoutE1(new_edge_attr)  # M, d
-        edge_attr = self.normE1(edge_attr + new_edge_attr_d)
+        edge_attr = self.normE1(edge_attr + new_edge_attr)
 
         if self.last_layer:
-            new_y_d = self.dropout_y1(new_y)  # bs, dy
-            y = self.norm_y1(y + new_y_d)
+            y = self.norm_y1(y + new_y)
         else:
             y = new_y
 
-        ff_outputX = self.linX2(self.dropoutX2(self.activation(self.linX1(X))))
-        ff_outputX = self.dropoutX3(ff_outputX)
+        ff_outputX = self.linX2(self.activation(self.linX1(X)))
         X = self.normX2(X + ff_outputX)
 
-        ff_outputE = self.linE2(self.dropoutE2(self.activation(self.linE1(edge_attr))))
-        ff_outputE = self.dropoutE3(ff_outputE)
+        ff_outputE = self.linE2(self.activation(self.linE1(edge_attr)))
         edge_attr = self.normE2(edge_attr + ff_outputE)
 
         if self.last_layer:
-            ff_output_y = self.lin_y2(self.dropout_y2(self.activation(self.lin_y1(y))))
-            ff_output_y = self.dropout_y3(ff_output_y)
+            ff_output_y = self.lin_y2(self.activation(self.lin_y1(y)))
             y = self.norm_y2(y + ff_output_y)
 
         return X, edge_attr, y
@@ -143,13 +130,11 @@ class GraphTransformerConv(nn.Module):
         self.out_dim_y = output_dims.y
         self.out_dim_charge = output_dims.charge
         self.output_y = output_y
+        self.dropout = dropout
 
         self.lin_in_X = nn.Linear(input_dims.X + input_dims.charge + sn_hidden_dim, hidden_dims["dx"])
         self.lin_in_E = nn.Linear(input_dims.E, hidden_dims["de"])
         self.lin_in_y = nn.Linear(input_dims.y, hidden_dims["dy"])
-        self.drop_in_X = nn.Dropout(dropout)
-        self.drop_in_E = nn.Dropout(dropout)
-        self.drop_in_y = nn.Dropout(dropout)
 
         # last layer is True when we keep the last output layers of y
         self.tf_layers = nn.ModuleList(
@@ -170,6 +155,7 @@ class GraphTransformerConv(nn.Module):
         self.out_ln_E = nn.LayerNorm(hidden_dims["de"])
         self.lin_out_X = nn.Linear(hidden_dims["dx"], output_dims.X + output_dims.charge)
         self.lin_out_E = nn.Linear(hidden_dims["de"], output_dims.E)
+
         if self.output_y:
             self.out_ln_y = nn.LayerNorm(hidden_dims["dy"])
             self.lin_out_y = nn.Linear(hidden_dims["dy"], output_dims.y)
@@ -181,12 +167,14 @@ class GraphTransformerConv(nn.Module):
         y0 = y.clone()
 
         # Input block
-        X = self.drop_in_X(self.lin_in_X(X))
-        edge_attr = self.drop_in_E(self.lin_in_E(edge_attr))
-        y = self.drop_in_y(self.lin_in_y(y))
+        X = self.lin_in_X(X)
+        edge_attr = self.lin_in_E(edge_attr)
+        y = self.lin_in_y(y)
 
         # Transformer layers
+        from time import time
         for layer in self.tf_layers:
+            time1 = time()
             X, edge_attr, y = layer(X, edge_index, edge_attr, y, batch)
 
         # Output block
@@ -199,8 +187,8 @@ class GraphTransformerConv(nn.Module):
         top_edge_index, top_edge_attr = sort_edge_index(edge_index, edge_attr)
         _, bot_edge_attr = sort_edge_index(edge_index[[1, 0]], edge_attr)
 
-        charges = X[:, self.out_dim_X: self.out_dim_X + self.out_dim_charge] +\
-                  X0[:, self.out_dim_X: self.out_dim_X + self.out_dim_charge]
+        charges = X[:, self.out_dim_X: self.out_dim_X + self.out_dim_charge] + \
+                    X0[:, self.out_dim_X: self.out_dim_X + self.out_dim_charge]
         X = X[:, :self.out_dim_X] + X0[:, :self.out_dim_X]
         edge_attr = top_edge_attr + bot_edge_attr + edge_attr0[:, :self.out_dim_E]
 

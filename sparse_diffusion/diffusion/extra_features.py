@@ -19,19 +19,27 @@ def batch_diagonal(X):
 
 class DummyExtraFeatures:
     """This class does not compute anything, just returns empty tensors."""
-    def __call__(self, noisy_data):
+    def __call__(self, noisy_data, sparse=True):
         X = noisy_data["node_t"]
         if "comp_edge_attr_t" not in noisy_data:
             E = noisy_data["edge_attr_t"]
         else:
             E = noisy_data["comp_edge_attr_t"]
+
         y = noisy_data["y_t"]
         empty_x = X.new_zeros((*X.shape[:-1], 0))
         empty_e = E.new_zeros((*E.shape[:-1], 0))
         empty_y = y.new_zeros((y.shape[0], 0))
-        return utils.SparsePlaceHolder(
-            node=empty_x, edge_index=None, edge_attr=empty_e, y=empty_y
-        ), 0., 0.
+
+        if sparse:
+            return utils.SparsePlaceHolder(
+                node=empty_x, edge_index=None, edge_attr=empty_e, y=empty_y
+            ), 0., 0.
+        else:
+            empty_e = E.new_zeros((*E.shape[:-1], 0, 0))
+            return utils.PlaceHolder(
+                X=empty_x, E=empty_e, y=empty_y
+            ), 0., 0.
 
 
 class ExtraFeatures:
@@ -109,7 +117,14 @@ class EigenFeatures:
         # debug for protein dataset
         if L.isnan().any():
             import pdb; pdb.set_trace()
-        eigvals, eigvectors = torch.linalg.eigh(L)
+
+        try:
+            eigvals, eigvectors = torch.linalg.eigh(L)
+        except:
+            eigvals, eigvectors = torch.linalg.eigh(L.cpu())  # debug for point cloud dataset
+            eigvals = eigvals.to(L.device)
+            eigvectors = eigvectors.to(L.device)
+
         eigvals = eigvals.type_as(A) / torch.sum(mask, dim=1, keepdim=True)
         eigvectors = eigvectors * mask.unsqueeze(2) * mask.unsqueeze(1)
         # Retrieve eigenvalues features

@@ -6,11 +6,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
+from torch.nn import ReLU
 from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.typing import Adj, OptTensor, Size
 from torch_geometric.utils import softmax
 from sparse_diffusion.models.layers import SparseXtoy, SparseEtoy
+
+compress_alpha = True
+compress_edge_attr = True
 
 
 class TransformerConv(MessagePassing):
@@ -53,8 +57,8 @@ class TransformerConv(MessagePassing):
         self.df = int(dx / heads)
         self.heads = heads
         self.concat = concat
-        self.dropout = dropout
         self.last_layer = last_layer
+        self.dropout = dropout
 
         self.lin_key = Linear(dx, heads * self.df)
         self.lin_query = Linear(dx, heads * self.df)
@@ -66,6 +70,7 @@ class TransformerConv(MessagePassing):
             self.lin_skip = Linear(dx, self.df, bias=bias)
 
         # FiLM E to X: de = dx here as defined in lin_edge
+
         self.e_add = Linear(de, heads)
         self.e_mul = Linear(de, heads)
 
@@ -187,16 +192,19 @@ class TransformerConv(MessagePassing):
         size_i: Optional[int],
     ) -> Tensor:
         Y = (query_i * key_j) / math.sqrt(self.df)  # M, H, C
+
         edge_attr_mul = self.e_mul(edge_attr)  # M, H
         edge_attr_add = self.e_add(edge_attr)  # M, H
         Y = Y * (edge_attr_mul.unsqueeze(-1) + 1) + edge_attr_add.unsqueeze(-1)
 
         alpha = softmax(Y.sum(-1), index, ptr, size_i)  # M, H
-        self._alpha = alpha
-        alpha = F.dropout(alpha, p=self.dropout, training=self.training)  # M, H
+
+        # dropout or not
+        self._alpha = alpha  # alpha = attn
+        # alpha = F.dropout(alpha, p=self.dropout, training=self.training)  # M, H
 
         out = value_j  # M, H, C
-        out = out * alpha.view(-1, self.heads, 1)  # M, H, C
+        out = out * alpha.view(-1, self.heads, 1)  # M, H, C, out = weighted_V
 
         return (out, Y)
 

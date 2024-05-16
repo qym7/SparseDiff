@@ -74,4 +74,5 @@ class TrainLossDiscrete(nn.Module):
         }
         if wandb.run:
             wandb.log(to_log, commit=False)
+
         return to_log
