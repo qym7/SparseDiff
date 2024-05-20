@@ -24,16 +24,18 @@ from sparse_diffusion.metrics.sampling_metrics import SamplingMetrics
 
 # debug for multi-gpu
 import resource
+
 resource.setrlimit(
     resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
 )
+
 
 @hydra.main(version_base="1.3", config_path="../configs", config_name="config")
 def main(cfg: DictConfig):
     dataset_config = cfg["dataset"]
     pl.seed_everything(cfg.train.seed)
 
-    print('creating datasets')
+    print("creating datasets")
     if dataset_config["name"] in ["sbm", "comm20", "planar", "ego"]:
         from datasets.spectre_dataset_pyg import (
             SBMDataModule,
@@ -57,7 +59,7 @@ def main(cfg: DictConfig):
         domain_features = DummyExtraFeatures()
         dataloaders = datamodule.dataloaders
 
-    elif dataset_config["name"] == 'protein':
+    elif dataset_config["name"] == "protein":
         from datasets import protein_dataset
 
         datamodule = protein_dataset.ProteinDataModule(cfg)
@@ -66,7 +68,7 @@ def main(cfg: DictConfig):
         domain_features = DummyExtraFeatures()
         dataloaders = datamodule.dataloaders
 
-    elif dataset_config["name"] == 'point_cloud':
+    elif dataset_config["name"] == "point_cloud":
         from datasets import point_cloud_dataset
 
         datamodule = point_cloud_dataset.PointCloudDataModule(cfg)
@@ -119,7 +121,7 @@ def main(cfg: DictConfig):
             num_eigenvalues=cfg.model.num_eigenvalues,
             num_degree=cfg.model.num_degree,
             dist_feat=cfg.model.dist_feat,
-            use_positional=cfg.model.positional_encoding
+            use_positional=cfg.model.positional_encoding,
         )
         if ef is not None
         else DummyExtraFeatures()
@@ -147,8 +149,8 @@ def main(cfg: DictConfig):
     }
 
     utils.create_folders(cfg)
-    
-    print('creating model')
+
+    print("creating model")
     model = DiscreteDenoisingDiffusion(cfg=cfg, **model_kwargs)
 
     callbacks = []
@@ -156,12 +158,11 @@ def main(cfg: DictConfig):
         checkpoint_callback = ModelCheckpoint(
             dirpath=f"checkpoints/{cfg.general.name}",
             filename="{epoch}",
-            save_last=True,
-            monitor=cfg.general.monitor,
-            save_top_k=cfg.general.save_top_k,
+            monitor="val/epoch_NLL",
+            save_top_k=15,
             mode="min",
-            save_on_train_epoch_end=cfg.general.save_on_train_epoch_end,
-            every_n_epochs=cfg.general.every_n_epochs,
+            every_n_epochs=1,
+            save_last=True,
         )
         last_ckpt_save = ModelCheckpoint(
             dirpath=f"checkpoints/{cfg.general.name}",
@@ -189,7 +190,7 @@ def main(cfg: DictConfig):
         callbacks=callbacks,
         log_every_n_steps=50 if name != "debug" else 1,
         enable_progress_bar=False,
-        logger=[]
+        logger=[],
     )
 
     if not cfg.general.test_only and not cfg.general.generated_path:

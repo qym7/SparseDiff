@@ -23,3 +23,6 @@ final_model_samples_to_save: 30
 final_model_chains_to_save: 20
 
 evaluate_all_checkpoints: False
+
+# sampling skip
+skip: 1

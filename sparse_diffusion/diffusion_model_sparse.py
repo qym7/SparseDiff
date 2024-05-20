@@ -38,7 +38,6 @@ from sparse_diffusion.diffusion.sample_edges import (
 from sparse_diffusion.models.sign_pos_encoder import SignNetNodeEncoder
 
 
-
 class DiscreteDenoisingDiffusion(pl.LightningModule):
     model_dtype = torch.float32
     best_val_nll = 1e8
@@ -114,7 +113,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             output_dims=self.out_dims,
             sn_hidden_dim=cfg.model.sn_hidden_dim,
             output_y=cfg.model.output_y,
-            dropout=cfg.model.dropout
+            dropout=cfg.model.dropout,
         )
 
         # whether to use sign net
@@ -132,7 +131,9 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         ) = self.get_scaling_layers()
 
         self.noise_schedule = PredefinedNoiseScheduleDiscrete(
-            cfg.model.diffusion_noise_schedule, timesteps=cfg.model.diffusion_steps, skip=self.cfg.general.skip
+            cfg.model.diffusion_noise_schedule,
+            timesteps=cfg.model.diffusion_steps,
+            skip=self.cfg.general.skip,
         )
 
         # Marginal transition
@@ -180,14 +181,8 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         # Map discrete classes to one hot encoding
         data = self.dataset_info.to_one_hot(data)
 
-        start_time = time.time()
         sparse_noisy_data = self.apply_sparse_noise(data)
-        if hasattr(self, "apply_noise_time"):
-            self.apply_noise_time.append(round(time.time() - start_time, 2))
-
         # Sample the query edges and build the computational graph = union(noisy graph, query edges)
-        start_time = time.time()
-        # print(data.ptr.diff())
         triu_query_edge_index, _ = sample_query_edges(
             num_nodes_per_graph=data.ptr.diff(), edge_proportion=self.edge_fraction
         )
@@ -201,7 +196,6 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         # pass sparse comp_graph to dense comp_graph for ease calculation
         sparse_noisy_data["comp_edge_index_t"] = comp_edge_index
         sparse_noisy_data["comp_edge_attr_t"] = comp_edge_attr
-        self.sample_query_time.append(round(time.time() - start_time, 2))
         sparse_pred = self.forward(sparse_noisy_data)
 
         # Compute the loss on the query edges only
@@ -212,7 +206,6 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         # We have the true edge index at time 0, and the query edge index at time t. This function
         # merge the query edges and edge index at time 0, delete repeated one, and retune the mask
         # for the true attr of query edges
-        start_time = time.time()
         (
             query_mask2,
             true_comp_edge_attr,
@@ -229,7 +222,6 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             true_comp_edge_index[:, query_mask2] - sparse_pred.edge_index == 0
         ).all()
 
-        self.query_count.append(len(query_true_edge_attr))
         true_data = utils.SparsePlaceHolder(
             node=data.x,
             charge=data.charge,
@@ -239,9 +231,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             batch=data.batch,
         )
         true_data.collapse()  # Map one-hot to discrete class
-        self.coalesce_time.append(round(time.time() - start_time, 2))
         # Loss calculation
-        start_time = time.time()
         loss = self.train_loss.forward(
             pred=sparse_pred,
             true_data=true_data,
@@ -250,8 +240,6 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         self.train_metrics(
             pred=sparse_pred, true_data=true_data, log=i % self.log_every_steps == 0
         )
-
-        self.loss_time.append(round(time.time() - start_time, 2))
 
         return {"loss": loss}
 
@@ -267,18 +255,8 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
 
     def on_train_epoch_start(self) -> None:
         self.print("Starting train epoch...")
-        self.start_epoch_time = time.time()
         self.train_loss.reset()
         self.train_metrics.reset()
-        self.query_count = []
-        self.apply_noise_time = []
-        self.extra_data_time = []
-        self.forward_time = []
-        self.sample_query_time = []
-        self.coalesce_time = []
-        self.loss_time = []
-        self.cycle_time = []
-        self.eigen_time = []
 
     def on_train_epoch_end(self) -> None:
         epoch_loss = self.train_loss.log_epoch_metrics()
@@ -295,19 +273,25 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             wandb.log({"epoch": self.current_epoch}, commit=True)
 
     def on_validation_epoch_start(self) -> None:
-        val_metrics = [self.val_nll, self.val_X_kl, self.val_E_kl, self.val_X_logp, self.val_E_logp,
-                       self.val_sampling_metrics]
+        val_metrics = [
+            self.val_nll,
+            self.val_X_kl,
+            self.val_E_kl,
+            self.val_X_logp,
+            self.val_E_logp,
+            self.val_sampling_metrics,
+        ]
         if self.use_charge:
             val_metrics.extend([self.val_charge_kl, self.val_charge_logp])
         for metric in val_metrics:
             metric.reset()
 
     def validation_step(self, data, i):
-        '''
+        """
         The evaluation is made for the whole graph, not only the query edges.
         It neccecitates an iteration as in the sampling step
-        '''
-        
+        """
+
         data = self.dataset_info.to_one_hot(data)
         sparse_noisy_data = self.apply_sparse_noise(data)
         ptr = data.ptr
@@ -316,16 +300,20 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         # prepare sparse information
         num_nodes = ptr.diff().long()
         num_edges = (num_nodes * (num_nodes - 1) / 2).long()
-        num_edges_ptr = torch.hstack([torch.tensor([0]).to(self.device), num_edges.cumsum(-1)]).long()
+        num_edges_ptr = torch.hstack(
+            [torch.tensor([0]).to(self.device), num_edges.cumsum(-1)]
+        ).long()
 
         # permute all edges
         num_edges_per_loop = torch.ceil(self.edge_fraction * num_edges)  # (bs, )
-        len_loop = math.ceil(1. / self.edge_fraction)
+        len_loop = math.ceil(1.0 / self.edge_fraction)
 
         # prepare sparse information
         num_nodes = ptr.diff().long()
         num_edges = (num_nodes * (num_nodes - 1) / 2).long()
-        num_edges_ptr = torch.hstack([torch.tensor([0]).to(self.device), num_edges.cumsum(-1)]).long()
+        num_edges_ptr = torch.hstack(
+            [torch.tensor([0]).to(self.device), num_edges.cumsum(-1)]
+        ).long()
 
         (
             all_condensed_index,
@@ -357,9 +345,15 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
 
                 triu_query_edge_index = all_condensed_index[edges_to_consider_mask]
                 query_edge_batch = all_edge_batch[edges_to_consider_mask]
-                condensed_query_edge_index = triu_query_edge_index + num_edges_ptr[query_edge_batch]
-                condensed_query_edge_index, condensed_query_edge_index_argsort = condensed_query_edge_index.sort()
-                edges_to_keep_mask_sorted = edges_to_keep_mask[edges_to_consider_mask][condensed_query_edge_index_argsort]
+                condensed_query_edge_index = (
+                    triu_query_edge_index + num_edges_ptr[query_edge_batch]
+                )
+                condensed_query_edge_index, condensed_query_edge_index_argsort = (
+                    condensed_query_edge_index.sort()
+                )
+                edges_to_keep_mask_sorted = edges_to_keep_mask[edges_to_consider_mask][
+                    condensed_query_edge_index_argsort
+                ]
             else:
                 # [0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1]
                 # all_condensed_index is not sorted inside the graph, but it sorted for graph batch
@@ -382,7 +376,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             query_mask, comp_edge_index, comp_edge_attr = get_computational_graph(
                 triu_query_edge_index=triu_query_edge_index,
                 clean_edge_index=sparse_noisy_data["edge_index_t"],
-                clean_edge_attr=sparse_noisy_data["edge_attr_t"]
+                clean_edge_attr=sparse_noisy_data["edge_attr_t"],
             )
 
             # pass sparse comp_graph to dense comp_graph for ease calculation
@@ -404,9 +398,14 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
                 new_condensed_edge_index = matrix_to_condensed_index_batch(
                     matrix_index=new_edge_index_no_batch,
                     num_nodes=num_nodes,
-                    edge_batch=new_edge_batch)
-                new_condensed_edge_index = new_condensed_edge_index + num_edges_ptr[new_edge_batch]
-                new_condensed_edge_index, new_condensed_edge_index_argsort = new_condensed_edge_index.sort()
+                    edge_batch=new_edge_batch,
+                )
+                new_condensed_edge_index = (
+                    new_condensed_edge_index + num_edges_ptr[new_edge_batch]
+                )
+                new_condensed_edge_index, new_condensed_edge_index_argsort = (
+                    new_condensed_edge_index.sort()
+                )
                 new_edge_attr = new_edge_attr[new_condensed_edge_index_argsort]
                 new_edge_index = new_edge_index[:, new_condensed_edge_index_argsort]
 
@@ -502,16 +501,19 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         self.val_counter += 1
         print("Starting to sample")
         if self.val_counter % self.cfg.general.sample_every_val == 0:
-            start = time.time()
             samples_left_to_generate = self.cfg.general.samples_to_generate
             samples_left_to_save = self.cfg.general.samples_to_save
-            chains_left_to_save = self.cfg.general.chains_to_save        # multi gpu operation
-            samples_left_to_generate = math.ceil(samples_left_to_generate / max(self._trainer.num_devices, 1))
+            chains_left_to_save = self.cfg.general.chains_to_save  # multi gpu operation
+            samples_left_to_generate = math.ceil(
+                samples_left_to_generate / max(self._trainer.num_devices, 1)
+            )
             self.print(
                 f"Samples to generate: {samples_left_to_generate} for each of the {max(self._trainer.num_devices, 1)} devices"
             )
             print(f"Sampling start on GR{self.global_rank}")
-            print('multi-gpu metrics for uniqueness is not accurate in the validation step.')
+            print(
+                "multi-gpu metrics for uniqueness is not accurate in the validation step."
+            )
 
             generated_graphs = []
             ident = 0
@@ -538,7 +540,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             generated_graphs = utils.concat_sparse_graphs(generated_graphs)
             print(
                 f"Sampled {generated_graphs.batch.max().item()+1} batches on local rank {self.local_rank}. ",
-                "Sampling took {time.time() - start:.2f} seconds\n"
+                "Sampling took {time.time() - start:.2f} seconds\n",
             )
 
             print("Computing sampling metrics...")
@@ -546,11 +548,12 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
                 generated_graphs, self.current_epoch, local_rank=self.local_rank
             )
 
-            filename = os.path.join(os.getcwd(), f"epoch{self.current_epoch}_res_Mean{self.cfg.general.evaluate_mean}.txt")
-            with open(filename, 'w') as file:
+            filename = os.path.join(
+                os.getcwd(), f"epoch{self.current_epoch}_res_Mean.txt"
+            )
+            with open(filename, "w") as file:
                 for key, value in to_log.items():
-                    file.write(f'{key}: {value}\n')
-            
+                    file.write(f"{key}: {value}\n")
 
     def on_test_epoch_start(self) -> None:
         print("Starting test...")
@@ -558,8 +561,14 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             utils.setup_wandb(
                 self.cfg
             )  # Initialize wandb only on one process to log metrics only once
-        test_metrics = [self.test_nll, self.test_X_kl, self.test_E_kl, self.test_X_logp, self.test_E_logp,
-                        self.test_sampling_metrics]
+        test_metrics = [
+            self.test_nll,
+            self.test_X_kl,
+            self.test_E_kl,
+            self.test_X_logp,
+            self.test_E_logp,
+            self.test_sampling_metrics,
+        ]
         if self.use_charge:
             test_metrics.extend([self.test_charge_kl, self.test_charge_logp])
         for metric in test_metrics:
@@ -576,12 +585,17 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             with open(self.cfg.general.generated_path, "rb") as f:
                 samples = pickle.load(f)
         else:
-            self.cfg.general.final_model_samples_to_generate = self.cfg.general.test_variance * self.cfg.general.final_model_samples_to_generate
+            self.cfg.general.final_model_samples_to_generate = (
+                self.cfg.general.test_variance
+                * self.cfg.general.final_model_samples_to_generate
+            )
             samples_left_to_generate = self.cfg.general.final_model_samples_to_generate
             samples_left_to_save = self.cfg.general.final_model_samples_to_save
             chains_left_to_save = self.cfg.general.final_model_chains_to_save
             # multi gpu operation
-            samples_left_to_generate = math.ceil(samples_left_to_generate / max(self._trainer.num_devices, 1))
+            samples_left_to_generate = math.ceil(
+                samples_left_to_generate / max(self._trainer.num_devices, 1)
+            )
             self.print(
                 f"Samples to generate: {samples_left_to_generate} for each of the {max(self._trainer.num_devices, 1)} devices"
             )
@@ -656,7 +670,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
                 with open(f"generated_samples_rank{i}.pkl", "rb") as f:
                     samples.append(pickle.load(f))
             samples = utils.concat_sparse_graphs(samples)
-            print('saving all samples')
+            print("saving all samples")
             with open(f"generated_samples.pkl", "wb") as f:
                 pickle.dump(samples, f)
 
@@ -666,13 +680,13 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
                 samples, self.current_epoch, local_rank=self.local_rank
             )
             # save results for testing
-            print('saving results for testing')
+            print("saving results for testing")
             current_path = os.getcwd()
             res_path = os.path.join(
                 current_path,
                 f"test_epoch{self.current_epoch}.json",
             )
-            with open(res_path, 'w') as file:
+            with open(res_path, "w") as file:
                 # Convert the dictionary to a JSON string and write it to the file
                 json.dump(to_log, file)
         else:
@@ -685,29 +699,37 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
                 cur_to_log, _ = self.test_sampling_metrics.compute_all_metrics(
                     samples[i], self.current_epoch, local_rank=self.local_rank
                 )
-                if i==0:
+                if i == 0:
                     to_log = {i: [cur_to_log[i]] for i in cur_to_log}
                 else:
                     to_log = {i: to_log[i] + [cur_to_log[i]] for i in cur_to_log}
 
-                print(f'For the {i} th sampling, we have: ')
+                print(f"For the {i} th sampling, we have: ")
                 print(cur_to_log)
-                filename = os.path.join(os.getcwd(), f"epoch{self.current_epoch}_res_part{i}_mean{self.test_variance}.txt")
-                with open(filename, 'w') as file:
+                filename = os.path.join(
+                    os.getcwd(),
+                    f"epoch{self.current_epoch}_res_part{i}_mean{self.test_variance}.txt",
+                )
+                with open(filename, "w") as file:
                     for key, value in cur_to_log.items():
-                        file.write(f'{key}: {value}\n')
+                        file.write(f"{key}: {value}\n")
 
                 with open(f"generated_samples_test{i}.pkl", "wb") as f:
                     pickle.dump(samples[i], f)
 
-            to_log = {i: (np.array(to_log[i]).mean(), np.array(to_log[i]).std()) for i in to_log}
+            to_log = {
+                i: (np.array(to_log[i]).mean(), np.array(to_log[i]).std())
+                for i in to_log
+            }
 
-        print(f'For overall {self.test_variance} samplings, we have: ')
+        print(f"For overall {self.test_variance} samplings, we have: ")
         print(to_log)
-        filename = os.path.join(os.getcwd(), f"epoch{self.current_epoch}_res_mean{self.test_variance}.txt")
-        with open(filename, 'w') as file:
+        filename = os.path.join(
+            os.getcwd(), f"epoch{self.current_epoch}_res_mean{self.test_variance}.txt"
+        )
+        with open(filename, "w") as file:
             for key, value in to_log.items():
-                file.write(f'{key}: {value}\n')
+                file.write(f"{key}: {value}\n")
 
         print("Test sampling metrics computed.")
 
@@ -844,7 +866,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         )
 
         # Combine terms
-        nlls = - log_pN + kl_prior + loss_all_t
+        nlls = -log_pN + kl_prior + loss_all_t
         # nlls = loss_all_t
         assert (~nlls.isnan()).all(), f"NLLs contain NaNs: {nlls}"
         assert len(nlls.shape) == 1, f"{nlls.shape} has more than only batch dim."
@@ -859,11 +881,11 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
                     "Estimator loss terms": loss_all_t.mean(),
                     "log_pn": log_pN.mean(),
                     "val_nll": nll,
-                    "epoch": self.current_epoch
+                    "epoch": self.current_epoch,
                 },
                 commit=False,
             )
-            
+
         return nll
 
     def kl_prior(self, X, E, node_mask, charge):
@@ -1015,8 +1037,12 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             true_charge=prob_true.charge,
             pred_charge=prob_pred.charge,
         )
-        kl_x = (self.test_X_kl if test else self.val_X_kl)(prob_true_X, torch.log(prob_pred.X))
-        kl_e = (self.test_E_kl if test else self.val_E_kl)(prob_true_E, torch.log(prob_pred.E))
+        kl_x = (self.test_X_kl if test else self.val_X_kl)(
+            prob_true_X, torch.log(prob_pred.X)
+        )
+        kl_e = (self.test_E_kl if test else self.val_E_kl)(
+            prob_true_E, torch.log(prob_pred.E)
+        )
 
         assert (~(kl_x + kl_e).isnan()).any()
         loss = kl_x + kl_e
@@ -1114,7 +1140,6 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         return utils.PlaceHolder(X=probX0, E=probE0, y=None, charge=prob_charge0)
 
     def forward_sparse(self, sparse_noisy_data):
-        start_time = time.time()
         node = sparse_noisy_data["node_t"]
         edge_attr = sparse_noisy_data["edge_attr_t"].float()
         edge_index = sparse_noisy_data["edge_index_t"].to(torch.int64)
@@ -1136,9 +1161,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
                 sparse_noisy_data["edge_index_t"],
                 sparse_noisy_data["batch"],
             )
-            sparse_noisy_data["node_t"] = torch.hstack(
-                [sparse_noisy_data["node_t"], x]
-            )
+            sparse_noisy_data["node_t"] = torch.hstack([sparse_noisy_data["node_t"], x])
 
         res = self.forward_sparse(sparse_noisy_data)
 
@@ -1192,7 +1215,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
 
         # Iteratively sample p(z_s | z_t) for t = 1, ..., T, with s = t - 1.
         time_range = torch.arange(0, self.T, self.cfg.general.skip)
-        for s_int in tqdm(reversed(time_range), total=self.T//self.cfg.general.skip):
+        for s_int in tqdm(reversed(time_range), total=self.T // self.cfg.general.skip):
             s_array = (s_int * torch.ones((batch_size, 1))).to(self.device)
             t_array = s_array + int(self.cfg.general.skip)
             s_norm = s_array / self.T
@@ -1304,9 +1327,9 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         # Dim of the second tensor: N, dx, dx
         weighted_X = pred_X.unsqueeze(-1) * p_s_and_t_given_0_X  # N, dx, dx
         unnormalized_prob_X = weighted_X.sum(dim=1)  # N, dx
-        unnormalized_prob_X[
-            torch.sum(unnormalized_prob_X, dim=-1) == 0
-        ] = 1e-5  # TODO: delete/masking?
+        unnormalized_prob_X[torch.sum(unnormalized_prob_X, dim=-1) == 0] = (
+            1e-5  # TODO: delete/masking?
+        )
         prob_X = unnormalized_prob_X / torch.sum(
             unnormalized_prob_X, dim=-1, keepdim=True
         )  # N, dx
@@ -1398,7 +1421,9 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         # prepare sparse information
         num_nodes = ptr.diff().long()
         num_edges = (num_nodes * (num_nodes - 1) / 2).long()
-        num_edges_ptr = torch.hstack([torch.tensor([0]).to(self.device), num_edges.cumsum(-1)]).long()
+        num_edges_ptr = torch.hstack(
+            [torch.tensor([0]).to(self.device), num_edges.cumsum(-1)]
+        ).long()
 
         # If we had one graph, we will iterate on all edges for each step
         # we also make sure that the non existing edge number remains the same with the training process
@@ -1410,10 +1435,10 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             max_condensed_value=num_edges,
             num_edges_to_sample=num_edges,
             return_mask=True,
-        )               # double checked
+        )  # double checked
         # number of edges used per loop for each graph
         num_edges_per_loop = torch.ceil(self.edge_fraction * num_edges)  # (bs, )
-        len_loop = math.ceil(1. / self.edge_fraction)
+        len_loop = math.ceil(1.0 / self.edge_fraction)
 
         new_edge_index, new_edge_attr, new_charge = (
             torch.zeros((2, 0), device=self.device, dtype=torch.long),
@@ -1451,9 +1476,15 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
 
                 triu_query_edge_index = all_condensed_index[edges_to_consider_mask]
                 query_edge_batch = all_edge_batch[edges_to_consider_mask]
-                condensed_query_edge_index = triu_query_edge_index + num_edges_ptr[query_edge_batch]
-                condensed_query_edge_index, condensed_query_edge_index_argsort = condensed_query_edge_index.sort()
-                edges_to_keep_mask_sorted = edges_to_keep_mask[edges_to_consider_mask][condensed_query_edge_index_argsort]
+                condensed_query_edge_index = (
+                    triu_query_edge_index + num_edges_ptr[query_edge_batch]
+                )
+                condensed_query_edge_index, condensed_query_edge_index_argsort = (
+                    condensed_query_edge_index.sort()
+                )
+                edges_to_keep_mask_sorted = edges_to_keep_mask[edges_to_consider_mask][
+                    condensed_query_edge_index_argsort
+                ]
             else:
                 # [0, 3, 2, 1, 0, 3, 2, 1, 0, 3, 2, 1]
                 # all_condensed_index is not sorted inside the graph, but it sorted for graph batch
@@ -1480,7 +1511,6 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
                 clean_edge_index=sparse_noisy_data["edge_index_t"],
                 clean_edge_attr=sparse_noisy_data["edge_attr_t"],
             )
-            # print('get_computational_graph time', time.time() - time0)
 
             # add computational graph
             sparse_noisy_data["comp_edge_index_t"] = comp_edge_index
@@ -1515,82 +1545,66 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             new_node = sampled_node
             new_charge = sampled_charge if self.use_charge else charge
             sampled_edge_index = comp_edge_index[:, query_mask]
-            # print('sample_sparse_node_edge time', time.time() - time3)
 
             # update edges iteratively
-            if self.autoregressive:
-                if new_charge.numel() > 0:
-                    new_charge = F.one_hot(new_charge, num_classes=self.out_dims.charge)
-                new_node = F.one_hot(new_node, num_classes=self.out_dims.X)
 
-                # filter out non-existing edges
-                exist_edge_pos = sampled_edge_attr != 0
-                sampled_edge_attr = sampled_edge_attr[exist_edge_pos]
-                sampled_edge_index = sampled_edge_index[:, exist_edge_pos].long()
-
-                # pass to one-hot and concat with original edges
-                sampled_edge_index, sampled_edge_attr = utils.undirected_to_directed(
-                    sampled_edge_index, sampled_edge_attr
-                )
-                sampled_edge_attr = F.one_hot(
-                    sampled_edge_attr, num_classes=self.out_dims.E
-                )
-
-                # concat the last new_edge_attr and new sampled edges
-                sampled_edge_index, sampled_edge_attr = utils.to_undirected(
-                    sampled_edge_index, sampled_edge_attr
-                )
-                new_edge_attr = torch.vstack(
-                    [comp_edge_attr[~query_mask], sampled_edge_attr]
-                )
-                new_edge_index = torch.hstack(
-                    [comp_edge_index[:, ~query_mask], sampled_edge_index]
-                )
-            else:
-                sampled_edge_index, sampled_edge_attr = utils.undirected_to_directed(
-                    sampled_edge_index, sampled_edge_attr
-                )
-
-                if i == len_loop - 1:
-                    # print('before filter', sampled_edge_index.shape)
-                    sampled_edge_batch = batch[sampled_edge_index[0]]
-                    sampled_edge_index_no_batch = sampled_edge_index - ptr[sampled_edge_batch]
-                    sampled_condensed_edge_index = matrix_to_condensed_index_batch(
-                        matrix_index=sampled_edge_index_no_batch,
-                        num_nodes=num_nodes,
-                        edge_batch=sampled_edge_batch)
-                    sampled_condensed_edge_index = sampled_condensed_edge_index + num_edges_ptr[sampled_edge_batch]
-                    sampled_condensed_edge_index, sampled_condensed_edge_index_argsort = sampled_condensed_edge_index.sort()
-                    sampled_edge_attr = sampled_edge_attr[sampled_condensed_edge_index_argsort]
-                    sampled_edge_index = sampled_edge_index[:, sampled_condensed_edge_index_argsort]
-
-                    sampled_edge_attr = sampled_edge_attr[edges_to_keep_mask_sorted]
-                    sampled_edge_index = sampled_edge_index[:, edges_to_keep_mask_sorted]
-                    # print('after filter', sampled_edge_index.shape)
-
-                exist_edge_pos = sampled_edge_attr != 0
-                new_edge_index = torch.hstack([new_edge_index, sampled_edge_index[:, exist_edge_pos]])
-                new_edge_attr = torch.hstack([new_edge_attr, sampled_edge_attr[exist_edge_pos]])
-            # print('update edges iteratively time', time.time() - time5)
-
-        if not self.autoregressive:
-            # there is maximum edges of repeatation maximum for twice
-            new_edge_index, new_edge_attr = utils.delete_repeated_twice_edges(
-                new_edge_index, new_edge_attr
-            )
-            # concat the last new_edge_attr and new sampled edges
-            new_edge_index, new_edge_attr = utils.to_undirected(
-                new_edge_index, new_edge_attr
+            sampled_edge_index, sampled_edge_attr = utils.undirected_to_directed(
+                sampled_edge_index, sampled_edge_attr
             )
 
-            new_node = F.one_hot(new_node, num_classes=self.out_dims.X)
-            new_charge = (
-                F.one_hot(new_charge, num_classes=self.out_dims.charge)
-                if self.use_charge
-                else new_charge
+            if i == len_loop - 1:
+                # print('before filter', sampled_edge_index.shape)
+                sampled_edge_batch = batch[sampled_edge_index[0]]
+                sampled_edge_index_no_batch = (
+                    sampled_edge_index - ptr[sampled_edge_batch]
+                )
+                sampled_condensed_edge_index = matrix_to_condensed_index_batch(
+                    matrix_index=sampled_edge_index_no_batch,
+                    num_nodes=num_nodes,
+                    edge_batch=sampled_edge_batch,
+                )
+                sampled_condensed_edge_index = (
+                    sampled_condensed_edge_index + num_edges_ptr[sampled_edge_batch]
+                )
+                (
+                    sampled_condensed_edge_index,
+                    sampled_condensed_edge_index_argsort,
+                ) = sampled_condensed_edge_index.sort()
+                sampled_edge_attr = sampled_edge_attr[
+                    sampled_condensed_edge_index_argsort
+                ]
+                sampled_edge_index = sampled_edge_index[
+                    :, sampled_condensed_edge_index_argsort
+                ]
+
+                sampled_edge_attr = sampled_edge_attr[edges_to_keep_mask_sorted]
+                sampled_edge_index = sampled_edge_index[:, edges_to_keep_mask_sorted]
+                # print('after filter', sampled_edge_index.shape)
+
+            exist_edge_pos = sampled_edge_attr != 0
+            new_edge_index = torch.hstack(
+                [new_edge_index, sampled_edge_index[:, exist_edge_pos]]
             )
-            new_edge_attr = F.one_hot(new_edge_attr.long(), num_classes=self.out_dims.E)
-            # print('update edges iteratively time', time.time() - time6)
+            new_edge_attr = torch.hstack(
+                [new_edge_attr, sampled_edge_attr[exist_edge_pos]]
+            )
+
+        # there is maximum edges of repeatation maximum for twice
+        new_edge_index, new_edge_attr = utils.delete_repeated_twice_edges(
+            new_edge_index, new_edge_attr
+        )
+        # concat the last new_edge_attr and new sampled edges
+        new_edge_index, new_edge_attr = utils.to_undirected(
+            new_edge_index, new_edge_attr
+        )
+
+        new_node = F.one_hot(new_node, num_classes=self.out_dims.X)
+        new_charge = (
+            F.one_hot(new_charge, num_classes=self.out_dims.charge)
+            if self.use_charge
+            else new_charge
+        )
+        new_edge_attr = F.one_hot(new_edge_attr.long(), num_classes=self.out_dims.E)
 
         assert torch.argmax(new_edge_attr, -1).min() > 0
         assert new_edge_attr.max() < 2
@@ -1618,15 +1632,10 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         # get extra features
         extra_data = self.extra_features(sparse_noisy_data)
         if type(extra_data) == tuple:
-            cycle_time, eigen_time = extra_data[1], extra_data[2]
             extra_data = extra_data[0]
         extra_mol_data = self.domain_features(sparse_noisy_data)
         if type(extra_mol_data) == tuple:
             extra_mol_data = extra_mol_data[0]
-
-        if hasattr(self, "cycle_time"):
-            self.cycle_time.append(cycle_time)
-            self.eigen_time.append(eigen_time)
 
         # get necessary parameters
         t_float = sparse_noisy_data["t_float"]

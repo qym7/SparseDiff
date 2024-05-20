@@ -132,7 +132,9 @@ class GraphTransformerConv(nn.Module):
         self.output_y = output_y
         self.dropout = dropout
 
-        self.lin_in_X = nn.Linear(input_dims.X + input_dims.charge + sn_hidden_dim, hidden_dims["dx"])
+        self.lin_in_X = nn.Linear(
+            input_dims.X + input_dims.charge + sn_hidden_dim, hidden_dims["dx"]
+        )
         self.lin_in_E = nn.Linear(input_dims.E, hidden_dims["de"])
         self.lin_in_y = nn.Linear(input_dims.y, hidden_dims["dy"])
 
@@ -153,7 +155,9 @@ class GraphTransformerConv(nn.Module):
         )
         self.out_ln_X = nn.LayerNorm(hidden_dims["dx"])
         self.out_ln_E = nn.LayerNorm(hidden_dims["de"])
-        self.lin_out_X = nn.Linear(hidden_dims["dx"], output_dims.X + output_dims.charge)
+        self.lin_out_X = nn.Linear(
+            hidden_dims["dx"], output_dims.X + output_dims.charge
+        )
         self.lin_out_E = nn.Linear(hidden_dims["de"], output_dims.E)
 
         if self.output_y:
@@ -172,9 +176,7 @@ class GraphTransformerConv(nn.Module):
         y = self.lin_in_y(y)
 
         # Transformer layers
-        from time import time
         for layer in self.tf_layers:
-            time1 = time()
             X, edge_attr, y = layer(X, edge_index, edge_attr, y, batch)
 
         # Output block
@@ -187,13 +189,15 @@ class GraphTransformerConv(nn.Module):
         top_edge_index, top_edge_attr = sort_edge_index(edge_index, edge_attr)
         _, bot_edge_attr = sort_edge_index(edge_index[[1, 0]], edge_attr)
 
-        charges = X[:, self.out_dim_X: self.out_dim_X + self.out_dim_charge] + \
-                    X0[:, self.out_dim_X: self.out_dim_X + self.out_dim_charge]
-        X = X[:, :self.out_dim_X] + X0[:, :self.out_dim_X]
-        edge_attr = top_edge_attr + bot_edge_attr + edge_attr0[:, :self.out_dim_E]
+        charges = (
+            X[:, self.out_dim_X : self.out_dim_X + self.out_dim_charge]
+            + X0[:, self.out_dim_X : self.out_dim_X + self.out_dim_charge]
+        )
+        X = X[:, : self.out_dim_X] + X0[:, : self.out_dim_X]
+        edge_attr = top_edge_attr + bot_edge_attr + edge_attr0[:, : self.out_dim_E]
 
         if self.output_y:
-            y = y + y0[:, :self.out_dim_y]
+            y = y + y0[:, : self.out_dim_y]
 
         return utils.SparsePlaceHolder(
             node=X,
@@ -201,5 +205,5 @@ class GraphTransformerConv(nn.Module):
             edge_index=top_edge_index,
             y=y,
             batch=batch,
-            charge=charges
+            charge=charges,
         )
