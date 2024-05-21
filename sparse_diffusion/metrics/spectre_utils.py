@@ -20,6 +20,7 @@ import numpy as np
 import networkx as nx
 import subprocess as sp
 import concurrent.futures
+
 try:
     import graph_tool.all as gt
 except ModuleNotFoundError:
@@ -28,7 +29,12 @@ from datetime import datetime
 from scipy.linalg import eigvalsh
 from scipy.stats import chi2
 from string import ascii_uppercase, digits
-from torch_geometric.utils import to_dense_adj, is_undirected, to_networkx, remove_self_loops
+from torch_geometric.utils import (
+    to_dense_adj,
+    is_undirected,
+    to_networkx,
+    remove_self_loops,
+)
 
 from sparse_diffusion.utils import SparsePlaceHolder
 from sparse_diffusion.analysis.dist_helper import (
@@ -42,9 +48,8 @@ from sparse_diffusion.analysis.dist_helper import (
 from sparse_diffusion.metrics.neural_metrics import (
     FIDEvaluation,
     MMDEvaluation,
-    load_feature_extractor
+    load_feature_extractor,
 )
-
 
 
 from sparse_diffusion.utils import SparsePlaceHolder
@@ -105,14 +110,15 @@ def degree_stats(graph_ref_list, graph_pred_list, is_parallel=True, compute_emd=
 
 ###############################################################################
 
+
 def spectral_worker(G, n_eigvals=-1):
     # eigs = nx.laplacian_spectrum(G)
     try:
-        eigs = eigvalsh(nx.normalized_laplacian_matrix(G).todense())  
+        eigs = eigvalsh(nx.normalized_laplacian_matrix(G).todense())
     except:
         eigs = np.zeros(G.number_of_nodes())
     if n_eigvals > 0:
-        eigs = eigs[1:n_eigvals+1]
+        eigs = eigs[1 : n_eigvals + 1]
     eigs = np.clip(eigs, 1e-5, 2)
     spectral_pmf, _ = np.histogram(eigs, bins=200, range=(-1e-5, 2), density=False)
     spectral_pmf = spectral_pmf / spectral_pmf.sum()
@@ -286,53 +292,61 @@ def spectral_filter_stats(
     return mmd_dist
 
 
-def spectral_stats(graph_ref_list, graph_pred_list, is_parallel=True, n_eigvals=-1, compute_emd=False):
-    ''' Compute the distance between the degree distributions of two unordered sets of graphs.
-        Args:
-            graph_ref_list, graph_target_list: two lists of networkx graphs to be evaluated
-        '''
+def spectral_stats(
+    graph_ref_list, graph_pred_list, is_parallel=True, n_eigvals=-1, compute_emd=False
+):
+    """Compute the distance between the degree distributions of two unordered sets of graphs.
+    Args:
+        graph_ref_list, graph_target_list: two lists of networkx graphs to be evaluated
+    """
     sample_ref = []
     sample_pred = []
     # in case an empty graph is generated
     graph_pred_list_remove_empty = [
-            G for G in graph_pred_list if not G.number_of_nodes() == 0
+        G for G in graph_pred_list if not G.number_of_nodes() == 0
     ]
 
     prev = datetime.now()
     if is_parallel:
         i = 0
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            for spectral_density in executor.map(spectral_worker, graph_ref_list, [n_eigvals for i in graph_ref_list]):
+            for spectral_density in executor.map(
+                spectral_worker, graph_ref_list, [n_eigvals for i in graph_ref_list]
+            ):
                 sample_ref.append(spectral_density)
                 # import pdb; pdb.set_trace()
-                if i==0:
-                    print('train spectral_density is', spectral_density)
-                i+=1
-        
-        i=0
+                if i == 0:
+                    print("train spectral_density is", spectral_density)
+                i += 1
+
+        i = 0
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            for spectral_density in executor.map(spectral_worker, graph_pred_list_remove_empty, [n_eigvals for i in graph_ref_list]):
+            for spectral_density in executor.map(
+                spectral_worker,
+                graph_pred_list_remove_empty,
+                [n_eigvals for i in graph_ref_list],
+            ):
                 # import pdb; pdb.set_trace()
                 sample_pred.append(spectral_density)
-                if i==0:
-                    print('test spectral_density is', spectral_density)
-                i+=1
+                if i == 0:
+                    print("test spectral_density is", spectral_density)
+                i += 1
     else:
         i = 0
         for i in range(len(graph_ref_list)):
             spectral_temp = spectral_worker(graph_ref_list[i], n_eigvals)
             sample_ref.append(spectral_temp)
-            if i==0:
-                print('train spectral_density is', spectral_temp)
-            i+=1
-    
+            if i == 0:
+                print("train spectral_density is", spectral_temp)
+            i += 1
+
         i = 0
         for i in range(len(graph_pred_list_remove_empty)):
             spectral_temp = spectral_worker(graph_pred_list_remove_empty[i], n_eigvals)
             sample_pred.append(spectral_temp)
-            if i==0:
-                print('test spectral_density is', spectral_temp)
-            i+=1
+            if i == 0:
+                print("test spectral_density is", spectral_temp)
+            i += 1
 
     if compute_emd:
         # EMD option uses the same computation as GraphRNN, the alternative is MMD as computed by GRAN
@@ -344,10 +358,9 @@ def spectral_stats(graph_ref_list, graph_pred_list, is_parallel=True, n_eigvals=
 
     elapsed = datetime.now() - prev
     if PRINT_TIME:
-        print('Time computing degree mmd: ', elapsed)
+        print("Time computing degree mmd: ", elapsed)
 
     return mmd_dist
-
 
 
 ###############################################################################
@@ -453,6 +466,7 @@ def orca(graph):
     for u, v in edge_list_reindexed(graph):
         f.write(str(u) + " " + str(v) + "\n")
     f.close()
+
     output = sp.check_output(
         [
             str(
@@ -869,14 +883,14 @@ class SpectreSamplingMetrics(nn.Module):
         self.train_graphs = self.loader_to_nx(dataloaders["train"])
         # self.val_graphs = self.loader_to_nx(dataloaders["val"])
         # split = 'test' if test else 'val'
-        split = 'test' if test else 'test'  # to be deleted
+        split = "test" if test else "test"  # to be deleted
         self.test_graphs = self.loader_to_nx(dataloaders[split])
         print(self.test_graphs[0])
         # import pdb; pdb.set_trace()
         self.num_graphs_test = len(self.test_graphs)
         # self.num_graphs_val = len(self.val_graphs)
-        print('num_train_graphs is', len(self.train_graphs))
-        print('num_graphs_test is', self.num_graphs_test)
+        print("num_train_graphs is", len(self.train_graphs))
+        print("num_graphs_test is", self.num_graphs_test)
         # print('num_graphs_val is', self.num_graphs_val)
         self.compute_emd = compute_emd
         self.metrics_list = metrics_list
@@ -887,12 +901,12 @@ class SpectreSamplingMetrics(nn.Module):
             data_list = batch.to_data_list()
             for j, data in enumerate(data_list):
                 nx_graph1 = to_networkx(
-                        data,
-                        node_attrs=None,
-                        edge_attrs=None,
-                        to_undirected=True,
-                        remove_self_loops=True,
-                    )
+                    data,
+                    node_attrs=None,
+                    edge_attrs=None,
+                    to_undirected=True,
+                    remove_self_loops=True,
+                )
                 networkx_graphs.append(nx_graph1)  # 0.448
 
         return networkx_graphs
@@ -905,9 +919,13 @@ class SpectreSamplingMetrics(nn.Module):
         torch.cuda.manual_seed_all(seed)
 
         # Neural metrics
-        gin_model = load_feature_extractor(device='cpu')  # take a gin-model with predefined params and random weights
+        gin_model = load_feature_extractor(
+            device="cpu"
+        )  # take a gin-model with predefined params and random weights
         fid_evaluator = FIDEvaluation(model=gin_model)
-        rbf_evaluator = MMDEvaluation(model=gin_model, kernel='rbf', sigma='range', multiplier='mean')
+        rbf_evaluator = MMDEvaluation(
+            model=gin_model, kernel="rbf", sigma="range", multiplier="mean"
+        )
         # pass the generated graphs and reference graphs to networkx
         generated_max_comp = []
         test_max_comp = []
@@ -915,21 +933,23 @@ class SpectreSamplingMetrics(nn.Module):
             # largest_cc = max(nx.connected_components(g), key=len)
             # g = g.subgraph(largest_cc)
             g = dgl.DGLGraph(g)
-            generated_max_comp.append(g)  
+            generated_max_comp.append(g)
         for g in self.test_graphs:
             # largest_cc = max(nx.connected_components(g), key=len)
             # g = g.subgraph(largest_cc)
             g = dgl.DGLGraph(g)
             test_max_comp.append(g)
 
-        (generated_dataset, reference_dataset), _ = fid_evaluator.get_activations(generated_max_comp, test_max_comp)
+        (generated_dataset, reference_dataset), _ = fid_evaluator.get_activations(
+            generated_max_comp, test_max_comp
+        )
         fid, _ = fid_evaluator.evaluate(
-                            generated_dataset=generated_dataset,
-                            reference_dataset=reference_dataset)
+            generated_dataset=generated_dataset, reference_dataset=reference_dataset
+        )
         rbf, _ = rbf_evaluator.evaluate(
-                            generated_dataset=generated_dataset,
-                            reference_dataset=reference_dataset)
-        
+            generated_dataset=generated_dataset, reference_dataset=reference_dataset
+        )
+
         return fid, rbf
 
     def forward(self, generated_graphs: SparsePlaceHolder, current_epoch, val_counter):
@@ -994,9 +1014,7 @@ class SpectreSamplingMetrics(nn.Module):
         if "orbit" in self.metrics_list:
             print("Computing orbit stats...")
             orbit = orbit_stats_all(
-                self.test_graphs,
-                networkx_graphs,
-                compute_emd=self.compute_emd
+                self.test_graphs, networkx_graphs, compute_emd=self.compute_emd
             )
             to_log["orbit"] = orbit
             if wandb.run is not None:
@@ -1019,12 +1037,12 @@ class SpectreSamplingMetrics(nn.Module):
         if "neural" in self.metrics_list:
             print("Computing neural metrics including FID and RBF MMD")
             fid, rbf = self.neural_metrics(networkx_graphs)
-            to_log["fid"] = fid['fid']
-            to_log["rbf mmd"] = rbf['mmd_rbf']
+            to_log["fid"] = fid["fid"]
+            to_log["rbf mmd"] = rbf["mmd_rbf"]
 
             if wandb.run is not None:
-                    wandb.run.summary["fid"] = fid['fid']
-                    wandb.run.summary["rbf mmd"] = rbf['mmd_rbf']
+                wandb.run.summary["fid"] = fid["fid"]
+                wandb.run.summary["rbf mmd"] = rbf["mmd_rbf"]
 
         if "motif" in self.metrics_list:
             print("Computing motif stats")
@@ -1076,7 +1094,14 @@ class PlanarSamplingMetrics(SpectreSamplingMetrics):
             dataloaders=dataloaders,
             compute_emd=False,
             test=test,
-            metrics_list=["degree", "clustering", "orbit", "spectre", "planar", "neural"],
+            metrics_list=[
+                "degree",
+                "clustering",
+                "orbit",
+                "spectre",
+                "planar",
+                "neural",
+            ],
         )
 
 
@@ -1098,7 +1123,6 @@ class ProteinSamplingMetrics(SpectreSamplingMetrics):
             test=test,
             metrics_list=["degree", "clustering", "orbit", "spectre", "neural"],
         )
-        
 
 
 class PointCloudSamplingMetrics(SpectreSamplingMetrics):

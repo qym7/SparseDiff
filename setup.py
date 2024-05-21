@@ -4,8 +4,8 @@ setup(
     name="SparseDiffusion",
     version="1.1.0",
     url=None,
-    author="Yiming Qin, Clement Vignac",
-    author_email="qinym710@gmail.com",
+    author="",
+    author_email="",
     description="Sparse denoising diffusion for large graph generation",
     packages=find_packages(),
 )

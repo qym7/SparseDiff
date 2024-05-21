@@ -51,17 +51,6 @@ This code was tested with PyTorch 2.0.1, cuda 11.8 and torch_geometrics 2.3.1
   - You can specify the dataset with `python3 main.py dataset=guacamol`. Look at `configs/dataset` for the list of datasets that are currently available
   - You can specify the edge fraction (denoted as $\lambda$ in the paper) with `python3 main.py model.edge_fraction=0.2` to control the GPU-usage
 
-## Cite the paper
-```
-@misc{qin2023sparse,
-      title={Sparse Training of Discrete Diffusion Models for Graph Generation}, 
-      author={Yiming Qin and Clement Vignac and Pascal Frossard},
-      year={2023},
-      eprint={2311.02142},
-      archivePrefix={arXiv},
-      primaryClass={cs.LG}
-}
-```
 
 <!-- If you have retrained a model from scratch for which the samples are not available yet, we would be very happy if you could send them to us! -->
 

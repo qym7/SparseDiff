@@ -164,7 +164,7 @@ class GraphTransformerConv(nn.Module):
             self.out_ln_y = nn.LayerNorm(hidden_dims["dy"])
             self.lin_out_y = nn.Linear(hidden_dims["dy"], output_dims.y)
 
-    def forward(self, X, edge_attr, edge_index, y, batch):
+    def forward(self, X, edge_attr, edge_index, query_attr, query_index, y, batch):
         # Save for residual connection
         X0 = X.clone()
         edge_attr0 = edge_attr.clone()
@@ -195,6 +195,7 @@ class GraphTransformerConv(nn.Module):
         )
         X = X[:, : self.out_dim_X] + X0[:, : self.out_dim_X]
         edge_attr = top_edge_attr + bot_edge_attr + edge_attr0[:, : self.out_dim_E]
+        edge_attr = edge_attr + edge_attr0[:, self.out_dim_E :]
 
         if self.output_y:
             y = y + y0[:, : self.out_dim_y]
