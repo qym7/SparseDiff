@@ -1,6 +1,6 @@
 # `Sparse denoising diffusion for large graph generation`
 
-Official code of [Sparse Training of Discrete Diffusion Models for Graph Generation](https://arxiv.org/abs/2311.02142).
+Official code of [Sparse Training of Discrete Diffusion Models for Graph Generation]
 
 Note (November 7th): the code is currently incomplete as we running experiments again with a slightly improved architecture. Checkpoints will be added progressively when they are available.
 
