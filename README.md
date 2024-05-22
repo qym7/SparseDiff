@@ -1,8 +1,9 @@
 # `Sparse denoising diffusion for large graph generation`
 
-Official code of [Sparse Training of Discrete Diffusion Models for Graph Generation](https://arxiv.org/abs/2311.02142).
+Official code for the paper, "Sparse Training of Discrete Diffusion Models for Graph Generation," available [here](https://arxiv.org/abs/2311.02142).
 
-Note (November 7th): the code is currently incomplete as we running experiments again with a slightly improved architecture. Checkpoints will be added progressively when they are available.
+Checkpoints to reproduce the results can be found at [this link](https://drive.switch.ch/index.php/s/1hHNVCb0ylbYPoQ). Please refer to the updated version of our paper on arXiv.
+
 
 ## Environment installation
 This code was tested with PyTorch 2.0.1, cuda 11.8 and torch_geometrics 2.3.1
