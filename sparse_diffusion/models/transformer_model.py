@@ -1,3 +1,8 @@
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 import math
 
 import torch
@@ -9,9 +14,9 @@ from torch.nn.modules.linear import Linear
 from torch.nn.modules.dropout import Dropout
 from torch.nn.modules.normalization import LayerNorm
 
-from sparse_diffusion import utils
-from sparse_diffusion.diffusion import diffusion_utils
-from sparse_diffusion.models.layers import Xtoy, Etoy, masked_softmax
+import utils
+from diffusion import diffusion_utils
+from models.layers import Xtoy, Etoy, masked_softmax
 
 
 class XEyTransformerLayer(nn.Module):

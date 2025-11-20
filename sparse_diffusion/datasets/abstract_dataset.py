@@ -1,8 +1,12 @@
 import abc
 import numpy as np
-
-from sparse_diffusion.diffusion.distributions import DistributionNodes
-import sparse_diffusion.utils as utils
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
+from diffusion.distributions import DistributionNodes
+import utils
 import torch
 import torch.nn.functional as F
 from torch_geometric.data.lightning import LightningDataset
@@ -26,7 +30,6 @@ class AbstractDataModule(LightningDataset):
 
     def dataset_stat(self):
         dataset = self.train_dataset + self.val_dataset + self.test_dataset
-        
         nodes = []
         edges = []
         sparsity = []
@@ -176,6 +179,7 @@ class AbstractDatasetInfos:
 
     def compute_input_dims(self, datamodule, extra_features, domain_features):
         data = next(iter(datamodule.train_dataloader()))
+        print(data)
         example_batch = self.to_one_hot(data)
         ex_dense, node_mask = utils.to_dense(
             example_batch.x,

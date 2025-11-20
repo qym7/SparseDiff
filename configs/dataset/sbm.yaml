@@ -1,5 +1,5 @@
 name: 'sbm'
-datadir: 'data/sbm'
+datadir: 'data/sbm/'
 remove_h: null
 molecules: False
 spectre: True

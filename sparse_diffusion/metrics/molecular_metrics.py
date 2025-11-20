@@ -1,4 +1,8 @@
-import os
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 from collections import Counter
 import pandas as pd
 
@@ -27,7 +31,7 @@ from torchmetrics.utilities.data import _flatten_dict, allclose
 from fcd_torch import FCD
 
 import utils
-from sparse_diffusion.metrics.metrics_utils import (
+from metrics.metrics_utils import (
     counter_to_tensor,
     wasserstein1d,
     total_variation1d,

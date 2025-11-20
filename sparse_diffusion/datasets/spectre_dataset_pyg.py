@@ -1,6 +1,9 @@
-import os
+import inspect
+import os, sys
 import pathlib
 import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 
 import numpy as np
 from tqdm import tqdm
@@ -12,19 +15,19 @@ from torch_geometric.data import InMemoryDataset, download_url
 from hydra.utils import get_original_cwd
 from networkx import to_numpy_array
 
-from sparse_diffusion.utils import PlaceHolder
-from sparse_diffusion.datasets.abstract_dataset import (
+from utils import PlaceHolder
+from datasets.abstract_dataset import (
     AbstractDataModule,
     AbstractDatasetInfos,
 )
-from sparse_diffusion.datasets.dataset_utils import (
+from datasets.dataset_utils import (
     load_pickle,
     save_pickle,
     Statistics,
     to_list,
     RemoveYTransform,
 )
-from sparse_diffusion.metrics.metrics_utils import (
+from metrics.metrics_utils import (
     node_counts,
     atom_type_counts,
     edge_counts,
@@ -55,7 +58,7 @@ class SpectreGraphDataset(InMemoryDataset):
             self.file_idx = 2
 
         super().__init__(root, transform, pre_transform, pre_filter)
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        self.data, self.slices = torch.load(self.processed_paths[0], **({"weights_only": False} if "weights_only" in inspect.signature(torch.load).parameters else {}))
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),
@@ -172,7 +175,7 @@ class SpectreGraphDataset(InMemoryDataset):
             random_order = torch.randperm(adj.shape[-1])
             adj = adj[random_order, :]
             adj = adj[:, random_order]
-            net = nx.from_numpy_matrix(adj.numpy()).to_undirected()
+            net = nx.from_numpy_array(adj.numpy()).to_undirected()
 
             if i in train_indices:
                 train_data.append(adj)

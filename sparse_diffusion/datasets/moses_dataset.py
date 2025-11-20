@@ -1,8 +1,8 @@
-import os
-import os.path as osp
+import os, sys
 import pathlib
-
-
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 import torch
 import torch.nn.functional as F
 from rdkit import Chem, RDLogger
@@ -12,19 +12,19 @@ import pandas as pd
 from torch_geometric.data import InMemoryDataset, download_url
 from hydra.utils import get_original_cwd
 
-from sparse_diffusion.utils import PlaceHolder
-from sparse_diffusion.datasets.abstract_dataset import (
+from utils import PlaceHolder
+from datasets.abstract_dataset import (
     MolecularDataModule,
     AbstractDatasetInfos,
 )
-from sparse_diffusion.datasets.dataset_utils import (
+from datasets.dataset_utils import (
     save_pickle,
     mol_to_torch_geometric,
     load_pickle,
     Statistics,
 )
-from sparse_diffusion.metrics.molecular_metrics import SparseMolecule
-from sparse_diffusion.metrics.metrics_utils import compute_all_statistics
+from metrics.molecular_metrics import SparseMolecule
+from metrics.metrics_utils import compute_all_statistics
 
 
 atom_encoder = {"C": 0, "N": 1, "S": 2, "O": 3, "F": 4, "Cl": 5, "Br": 6}

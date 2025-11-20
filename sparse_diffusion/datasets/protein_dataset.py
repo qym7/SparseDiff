@@ -1,6 +1,8 @@
-import os
+import os, sys
 import pathlib
 import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 
 import numpy as np
 import torch.nn.functional as F
@@ -11,25 +13,24 @@ from torch_geometric.utils import remove_self_loops
 from torch_geometric.data import InMemoryDataset, download_url
 from hydra.utils import get_original_cwd
 
-from sparse_diffusion.utils import PlaceHolder
-from sparse_diffusion.datasets.abstract_dataset import (
+from utils import PlaceHolder
+from datasets.abstract_dataset import (
     AbstractDataModule,
     AbstractDatasetInfos,
 )
-from sparse_diffusion.datasets.dataset_utils import (
+from datasets.dataset_utils import (
     load_pickle,
     save_pickle,
     Statistics,
     to_list,
     RemoveYTransform,
 )
-from sparse_diffusion.metrics.metrics_utils import (
+from metrics.metrics_utils import (
     node_counts,
     atom_type_counts,
     edge_counts,
     graph_counts,
 )
-
 
 class ProteinDataset(InMemoryDataset):
     '''

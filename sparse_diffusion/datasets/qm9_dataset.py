@@ -1,7 +1,9 @@
-import os
-import os.path as osp
+import inspect
+import os, sys
 import pathlib
-
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 
 import torch
 import torch.nn.functional as F
@@ -12,12 +14,12 @@ import pandas as pd
 from torch_geometric.data import InMemoryDataset, download_url, extract_zip
 from hydra.utils import get_original_cwd
 
-from sparse_diffusion.utils import PlaceHolder
-from sparse_diffusion.datasets.abstract_dataset import (
+from utils import PlaceHolder
+from datasets.abstract_dataset import (
     MolecularDataModule,
     AbstractDatasetInfos,
 )
-from sparse_diffusion.datasets.dataset_utils import (
+from datasets.dataset_utils import (
     load_pickle,
     save_pickle,
     mol_to_torch_geometric,
@@ -26,7 +28,7 @@ from sparse_diffusion.datasets.dataset_utils import (
     to_list,
     files_exist,
 )
-from sparse_diffusion.metrics.metrics_utils import compute_all_statistics
+from metrics.metrics_utils import compute_all_statistics
 
 
 class RemoveYTransform:
@@ -83,7 +85,7 @@ class QM9Dataset(InMemoryDataset):
             }
 
         super().__init__(root, transform, pre_transform, pre_filter)
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        self.data, self.slices = torch.load(self.processed_paths[0], **({"weights_only": False} if "weights_only" in inspect.signature(torch.load).parameters else {}))
 
         self.statistics = Statistics(
             num_nodes=load_pickle(self.processed_paths[1]),

@@ -1,6 +1,11 @@
 import torch.nn as nn
 import wandb
-from sparse_diffusion.metrics.abstract_metrics import CrossEntropyMetric
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
+from metrics.abstract_metrics import CrossEntropyMetric
 
 
 class TrainLossDiscrete(nn.Module):

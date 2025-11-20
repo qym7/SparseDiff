@@ -12,8 +12,14 @@ general:
     final_model_samples_to_generate: 40
     final_model_samples_to_save: 30
     final_model_chains_to_save: 20
+dataset:
+    name: 'planar'
+    datadir: 'data/planar/'
+    remove_h: null
+    molecules: False
+    spectre: True
 train:
-    n_epochs: 300000
+    n_epochs: 30
     batch_size: 64
     save_model: True
 model:

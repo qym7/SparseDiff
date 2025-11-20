@@ -1,5 +1,10 @@
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 import torch
-from sparse_diffusion import utils
+import utils
 
 import torch_geometric.nn.pool as pool
 

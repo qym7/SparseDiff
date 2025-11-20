@@ -1,6 +1,8 @@
-import os
-import os.path as osp
+import os, sys
 import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 
 import hashlib
 import numpy as np
@@ -12,19 +14,19 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.data import InMemoryDataset, download_url
 
-from sparse_diffusion.utils import PlaceHolder
-from sparse_diffusion.datasets.abstract_dataset import (
+from utils import PlaceHolder
+from datasets.abstract_dataset import (
     MolecularDataModule,
     AbstractDatasetInfos,
 )
-from sparse_diffusion.datasets.dataset_utils import (
+from datasets.dataset_utils import (
     save_pickle,
     mol_to_torch_geometric,
     load_pickle,
     Statistics,
 )
-from sparse_diffusion.metrics.molecular_metrics import SparseMolecule
-from sparse_diffusion.metrics.metrics_utils import compute_all_statistics
+from metrics.molecular_metrics import SparseMolecule
+from metrics.metrics_utils import compute_all_statistics
 
 
 TRAIN_HASH = "05ad85d871958a05c02ab51a4fde8530"

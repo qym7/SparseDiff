@@ -1,3 +1,8 @@
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 from collections import Counter
 
 import torch.nn as nn
@@ -10,8 +15,8 @@ from torch import Tensor
 from torch_geometric.utils import to_scipy_sparse_matrix
 import torch_geometric as pyg
 
-import sparse_diffusion.utils as utils
-from sparse_diffusion.metrics.metrics_utils import (
+import utils
+from metrics.metrics_utils import (
     counter_to_tensor,
     wasserstein1d,
     total_variation1d,

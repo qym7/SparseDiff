@@ -6,7 +6,11 @@
 
 ##Navigate to the ./util/orca directory and compile orca.cpp
 # g++ -O2 -std=c++11 -o orca orca.cpp
-import os
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 import copy
 import random
 
@@ -30,8 +34,8 @@ from scipy.stats import chi2
 from string import ascii_uppercase, digits
 from torch_geometric.utils import to_dense_adj, is_undirected, to_networkx, remove_self_loops
 
-from sparse_diffusion.utils import SparsePlaceHolder
-from sparse_diffusion.analysis.dist_helper import (
+from utils import SparsePlaceHolder
+from analysis.dist_helper import (
     compute_mmd,
     gaussian_emd,
     gaussian,
@@ -39,15 +43,13 @@ from sparse_diffusion.analysis.dist_helper import (
     gaussian_tv,
     disc,
 )
-from sparse_diffusion.metrics.neural_metrics import (
+from metrics.neural_metrics import (
     FIDEvaluation,
     MMDEvaluation,
     load_feature_extractor
 )
 
-
-
-from sparse_diffusion.utils import SparsePlaceHolder
+from utils import SparsePlaceHolder
 
 PRINT_TIME = False
 __all__ = [

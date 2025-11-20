@@ -1,0 +1,41 @@
+# @package _global_
+general:
+    name : 'wiki-vote'
+    num_bins: 27500
+    gpus : 1
+    wandb: 'online'
+    resume: null            # If resume, path to ckpt file from outputs directory in main directory
+    test_only: null
+    check_val_every_n_epochs: 1000
+    sample_every_val: 4
+    samples_to_generate: 64
+    samples_to_save: 9
+    chains_to_save: 1
+    final_model_samples_to_generate: 151
+    final_model_samples_to_save: 30
+    final_model_chains_to_save: 10
+dataset:
+    name: 'wiki-vote'
+    datadir: 'data/wiki-vote/'
+    random_subset: null
+    pin_memory: False
+    molecules: False
+    spectre: False
+train:
+    n_epochs: 100
+    batch_size: 32
+    save_model: True
+    num_workers: 0
+model:
+    diffusion_steps: 1000
+    n_layers: 8
+    num_degree: 20
+    lambda_train: [5, 0, 2]
+    extra_features: 'all'
+    edge_fraction: 0.1
+    # Do not set hidden_mlp_E, dim_ffE too high, computing large tensors on the edges is costly
+    # At the moment (03/08), y contains quite little information
+    hidden_mlp_dims: { 'X': 128, 'E': 64, 'y': 128 }
+    # The dimensions should satisfy dx % n_head == 0
+    hidden_dims: { 'dx': 256, 'de': 64, 'dy': 128, 'n_head': 8, 'dim_ffX': 256, 'dim_ffE': 64, 'dim_ffy': 256 }
+    pin_memory: False

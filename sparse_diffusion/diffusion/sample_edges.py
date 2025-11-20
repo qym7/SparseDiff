@@ -8,8 +8,13 @@ from torch_geometric.utils import to_dense_adj
 import torch_geometric.nn.pool as pool
 
 # My files
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 import utils
-from sparse_diffusion.diffusion.sample_edges_utils import (
+from diffusion.sample_edges_utils import (
     matrix_to_condensed_index,
     condensed_to_matrix_index_batch,
     condensed_to_matrix_index,

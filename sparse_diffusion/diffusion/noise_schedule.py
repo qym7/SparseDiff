@@ -1,7 +1,12 @@
 import numpy as np
 import torch
-from sparse_diffusion import utils
-from sparse_diffusion.diffusion import diffusion_utils
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
+import utils
+from diffusion import diffusion_utils
 
 
 class PredefinedNoiseSchedule(torch.nn.Module):

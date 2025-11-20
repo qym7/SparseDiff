@@ -1,3 +1,8 @@
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 import math
 from typing import Optional, Tuple, Union
 
@@ -14,9 +19,9 @@ from torch.nn.modules.normalization import LayerNorm
 import torch_geometric.nn.pool as pool
 from torch_geometric.utils import softmax, sort_edge_index
 
-from sparse_diffusion import utils
-from sparse_diffusion.models.transconv_layer import TransformerConv
-from sparse_diffusion.models.layers import SparseXtoy, SparseEtoy
+import utils
+from models.transconv_layer import TransformerConv
+from models.layers import SparseXtoy, SparseEtoy
 
 
 class XEyTransformerLayer(nn.Module):

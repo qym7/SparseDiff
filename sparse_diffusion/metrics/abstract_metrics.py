@@ -2,7 +2,12 @@ import torch
 from torch import Tensor
 from torch.nn import functional as F
 from torchmetrics import Metric, MeanSquaredError
-from sparse_diffusion.utils import PlaceHolder
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
+from utils import PlaceHolder
 
 
 class TrainAbstractMetricsDiscrete(torch.nn.Module):

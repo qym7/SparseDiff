@@ -2,10 +2,14 @@ import torch
 from torch.nn import functional as F
 import numpy as np
 import math
-
-from sparse_diffusion.utils import PlaceHolder
-from sparse_diffusion import utils
-from sparse_diffusion.diffusion.sample_edges import sample_query_edges
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
+import utils
+from utils import PlaceHolder
+from diffusion.sample_edges import sample_query_edges
 
 
 def sum_except_batch(x):

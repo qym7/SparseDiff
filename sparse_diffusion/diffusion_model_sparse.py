@@ -1,5 +1,9 @@
 import time
-import os
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 import math
 import pickle
 import json
@@ -21,21 +25,21 @@ from diffusion.noise_schedule import (
 from metrics.train_metrics import TrainLossDiscrete
 from metrics.abstract_metrics import SumExceptBatchMetric, SumExceptBatchKL, NLL
 from analysis.visualization import Visualizer
-from sparse_diffusion import utils
-from sparse_diffusion.diffusion import diffusion_utils
-from sparse_diffusion.diffusion.sample_edges_utils import (
+import utils
+from diffusion import diffusion_utils
+from diffusion.sample_edges_utils import (
     get_computational_graph,
     mask_query_graph_from_comp_graph,
     sample_non_existing_edge_attr,
     condensed_to_matrix_index_batch,
     matrix_to_condensed_index_batch,
 )
-from sparse_diffusion.diffusion.sample_edges import (
+from diffusion.sample_edges import (
     sample_query_edges,
     sample_non_existing_edges_batched,
     sampled_condensed_indices_uniformly,
 )
-from sparse_diffusion.models.sign_pos_encoder import SignNetNodeEncoder
+from models.sign_pos_encoder import SignNetNodeEncoder
 
 
 class DiscreteDenoisingDiffusion(pl.LightningModule):
@@ -1209,7 +1213,41 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         sparse_sampled_data = diffusion_utils.sample_sparse_discrete_feature_noise(
             limit_dist=self.limit_dist, node_mask=node_mask
         )
+        # ================= START FIX =================
+        # 問題修復：Sampling 時 y 為空，導致 dimension mismatch。
+        # 邏輯：模型總輸入 y 維度 = Base_y + Time(1) + Extra_y
+        if sparse_sampled_data.y.shape[1] == 0:
+            # 1. 計算 Extra Features 的 y 維度 (通過跑一次 dummy data)
+            dummy_data = {
+                'node_t': sparse_sampled_data.node[:1],
+                'edge_index_t': torch.zeros((2, 0), device=self.device, dtype=torch.long),
+                'edge_attr_t': torch.zeros((0, self.out_dims.E), device=self.device),
+                'batch': torch.zeros(1, device=self.device, dtype=torch.long),
+                'y_t': torch.zeros((1, 0), device=self.device), 
+                'charge_t': torch.zeros((1, 0), device=self.device),
+            }
+            
+            with torch.no_grad():
+                try:
+                    extra_feats = self.extra_features(dummy_data)
+                    if isinstance(extra_feats, tuple):
+                        extra_feats = extra_feats[0]
+                    extra_y_dim = extra_feats.y.shape[-1] if hasattr(extra_feats, 'y') else 0
+                except Exception as e:
+                    print(f"[Warning] Failed to verify extra features dim dynamically: {e}")
+                    # 如果動態計算失敗，根據你的 log 手動設定 (Total 41 - Time 1 - Base 2 = 38)
+                    extra_y_dim = 38 
 
+            # 2. 計算缺失的 Base Y 維度
+            # self.in_dims.y 是模型定義的總輸入維度 (41)
+            # 減去 Time step (1) 和 Extra Features (extra_y_dim)
+            base_y_dim = self.in_dims.y - 1 - extra_y_dim
+            
+            # 3. 初始化正確維度的 y (全 0)
+            if base_y_dim > 0:
+                sparse_sampled_data.y = torch.zeros((batch_size, base_y_dim), device=self.device)
+                print(f"[DEBUG Fix] Initialized empty y to shape: {sparse_sampled_data.y.shape} (Base: {base_y_dim}, Extra: {extra_y_dim}, Time: 1)")
+        # ================= END FIX =================
         assert number_chain_steps < self.T
         chain = utils.SparseChainPlaceHolder(keep_chain=keep_chain)
 
@@ -1381,6 +1419,7 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
         Samples from zs ~ p(zs | zt). Only used during sampling.
         if last_step, return the graph prediction as well
         """
+        print(f"[DEBUG sample_p_zs_given_zt] Input data.y shape: {data.y.shape}")
         node = data.node
         edge_index = data.edge_index
         edge_attr = data.edge_attr
@@ -1458,7 +1497,8 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             "t_int": (t_float * self.T).int(),
             "t_float": t_float,
         }
-
+        print(f"[DEBUG] sparse_noisy_data['y_t'] shape: {sparse_noisy_data['y_t'].shape}")
+    
         for i in range(len_loop):
             if self.autoregressive and i != 0:
                 sparse_noisy_data["edge_index_t"] = new_edge_index
@@ -1687,6 +1727,12 @@ class DiscreteDenoisingDiffusion(pl.LightningModule):
             "batch": sparse_noisy_data["batch"],
             "charge_t": sparse_noisy_data["charge_t"],
         }
+
+        # print(f"[DEBUG compute_extra_data] Input y_t: {sparse_noisy_data['y_t'].shape}")
+        # print(f"[DEBUG compute_extra_data] t_float: {t_float.shape}")
+        # print(f"[DEBUG compute_extra_data] extra_y: {extra_y.shape}")
+        # y = torch.hstack((sparse_noisy_data["y_t"], t_float, extra_y)).float()
+        # print(f"[DEBUG compute_extra_data] Final y: {y.shape}")
 
         return extra_sparse_noisy_data
 

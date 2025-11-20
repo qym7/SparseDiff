@@ -13,8 +13,15 @@ general:
     final_model_samples_to_generate: 151
     final_model_samples_to_save: 30
     final_model_chains_to_save: 10
+dataset:
+    name: 'ego'
+    datadir: 'data/ego/'
+    random_subset: null
+    pin_memory: False
+    molecules: False
+    spectre: False
 train:
-    n_epochs: 100000
+    n_epochs: 100
     batch_size: 32
     save_model: True
     num_workers: 0

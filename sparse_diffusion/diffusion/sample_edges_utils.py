@@ -1,9 +1,12 @@
 import torch
 import torch.nn.functional as F
 from torch_geometric.utils import coalesce
-
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 import utils
-
 
 def condensed_to_matrix_index(condensed_index, num_nodes):
     """From https://stackoverflow.com/questions/5323818/condensed-matrix-function-to-find-pairs.

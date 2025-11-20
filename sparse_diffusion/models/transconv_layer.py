@@ -1,3 +1,8 @@
+import os, sys
+import pathlib
+import os.path as osp
+RootPath = pathlib.Path(osp.realpath(__file__)).parents[1]
+sys.path.append(f'{RootPath}')
 import math
 from typing import Optional, Tuple, Union
 
@@ -11,7 +16,7 @@ from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.dense.linear import Linear
 from torch_geometric.typing import Adj, OptTensor, Size
 from torch_geometric.utils import softmax
-from sparse_diffusion.models.layers import SparseXtoy, SparseEtoy
+from models.layers import SparseXtoy, SparseEtoy
 
 compress_alpha = True
 compress_edge_attr = True
